@@ -32,7 +32,7 @@ function Invoke-TervisShopifyInterfaceItemUpdate {
 
     $NewRecordCount = Get-ShopifyStagingTableCount
     if ($NewRecordCount -gt 0) {
-        $NewRecords = Get-ShopifyStagingTableUpdates # | select -First 10
+        $NewRecords = Get-ShopifyStagingTableUpdates | select -First 10
         # Start-ParallelWork -ScriptBlock $ProductUpdateScriptBlock -Parameters $NewRecords -OptionalParameters $OtherParams -MaxConcurrentJobs $MaxConcurrentRequests
         $NewRecords | ForEach-Object {
             if ($_.ITEM_STATUS -in "Active","DTCDeplete") {
@@ -82,12 +82,12 @@ function Invoke-TervisShopifyAddOrUpdateProduct {
             $ShopifyRESTProduct = @{id = $NewOrUpdatedProduct.id -replace "[^0-9]"}
             $ShopifyInventoryItemId = $NewOrUpdatedProduct.variants.edges.node.inventoryItem.id -replace "[^0-9]"
             # Publish item to POS channel
-            Set-ShopifyRestProductChannel -ShopName $ShopName -Products $ShopifyRESTProduct -Channel global
+            Set-ShopifyRestProductChannel -ShopName $ShopName -Products $ShopifyRESTProduct -Channel global | Out-Null
             # Make item available at all locations -replace "[^0-9]"
             $InventoryItemLocations = Get-ShopifyInventoryItemLocations -ShopName $ShopName -InventoryItemId $ShopifyInventoryItemId
             $MissingLocations = $Locations | Where-Object Name -NotIn $InventoryItemLocations.Name
             foreach ($LocationId in $MissingLocations.id) {
-                Invoke-ShopifyInventoryActivate -InventoryItemId $ShopifyInventoryItemId -LocationId $LocationId -ShopName $ShopName
+                Invoke-ShopifyInventoryActivate -InventoryItemId $ShopifyInventoryItemId -LocationId $LocationId -ShopName $ShopName | Out-Null
             }
 
             # Write back to EBS staging table
