@@ -35,7 +35,7 @@ function Invoke-TervisShopifyInterfaceItemUpdate {
     if ($NewRecordCount -gt 0) {
         $i = 0
         Write-Progress -Activity "Syncing products to Shopify" -CurrentOperation "Getting product records"
-        $NewRecords = Get-ShopifyStagingTableUpdates | select -First 10
+        $NewRecords = Get-ShopifyStagingTableUpdates
         # Start-ParallelWork -ScriptBlock $ProductUpdateScriptBlock -Parameters $NewRecords -OptionalParameters $OtherParams -MaxConcurrentJobs $MaxConcurrentRequests
         $NewRecords | ForEach-Object {
             $i++; Write-Progress -Activity "Syncing products to Shopify" -Status "$i of $NewRecordCount" -PercentComplete ($i * 100 / $NewRecordCount) -CurrentOperation "Processing EBS item #$($_.ITEM_NUMBER)" -SecondsRemaining (($NewRecordCount - $i) * 4)
