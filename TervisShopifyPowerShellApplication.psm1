@@ -4,6 +4,7 @@ function Invoke-TervisShopifyInterfaceItemUpdate {
         [Parameter(Mandatory)][ValidateSet("Delta","Epsilon","Production")]$Environment
     )
     
+    Write-Progress -Activity "Syncing products to Shopify" -CurrentOperation "Setting environment variables"
     Set-TervisEBSEnvironment -Name $Environment
     Set-TervisShopifyEnvironment -Environment $Environment
 
@@ -32,9 +33,12 @@ function Invoke-TervisShopifyInterfaceItemUpdate {
 
     $NewRecordCount = Get-ShopifyStagingTableCount
     if ($NewRecordCount -gt 0) {
+        $i = 0
+        Write-Progress -Activity "Syncing products to Shopify" -CurrentOperation "Getting product records"
         $NewRecords = Get-ShopifyStagingTableUpdates | select -First 10
         # Start-ParallelWork -ScriptBlock $ProductUpdateScriptBlock -Parameters $NewRecords -OptionalParameters $OtherParams -MaxConcurrentJobs $MaxConcurrentRequests
         $NewRecords | ForEach-Object {
+            $i++; Write-Progress -Activity "Syncing products to Shopify" -Status "$i of $NewRecordCount" -PercentComplete ($i * 100 / $NewRecordCount) -CurrentOperation "Processing EBS item #$($_.ITEM_NUMBER)" -SecondsRemaining (($NewRecordCount - $i) * 4)
             if ($_.ITEM_STATUS -in "Active","DTCDeplete") {
                 $_ | Invoke-TervisShopifyAddOrUpdateProduct -ShopName $OtherParams.ShopName -Locations $OtherParams.Locations
             } else {
@@ -101,7 +105,7 @@ function Invoke-TervisShopifyAddOrUpdateProduct {
 
 function Invoke-TervisShopifyRemoveProduct {
     param (
-        [Parameter(Mandatory,ValueFromPipelineByPropertyName)]$ProductRecord,
+        [Parameter(Mandatory,ValueFromPipeline)]$ProductRecord,
         [Parameter(Mandatory)]$ShopName
     )
     process {
@@ -139,6 +143,7 @@ function Get-ShopifyStagingTableUpdates {
         FROM xxtrvs.xxtrvs_store_item_price_intf
         WHERE 1 = 1
         AND interfaced_flag = 'N'
+        ORDER BY 1
 "@
     Invoke-EBSSQL -SQLCommand $Query 
 }
