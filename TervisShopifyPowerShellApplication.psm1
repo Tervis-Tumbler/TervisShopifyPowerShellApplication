@@ -111,7 +111,9 @@ function Invoke-TervisShopifyRemoveProduct {
     process {
         try {
             $ShopifyProduct = Find-ShopifyProduct -ShopName $ShopName -SKU $ProductRecord.Item_Number
-            Remove-ShopifyProduct -GlobalId $ShopifyProduct.id -ShopName $ShopName | Out-Null
+            if ($ShopifyProduct) {
+                Remove-ShopifyProduct -GlobalId $ShopifyProduct.id -ShopName $ShopName | Out-Null
+            }
             Set-ShopifyStagingTableUpdateFlag -EbsItemNumber $ProductRecord.ITEM_NUMBER
         } catch {
             Write-Error $_
