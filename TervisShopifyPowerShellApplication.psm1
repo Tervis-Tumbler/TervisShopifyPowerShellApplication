@@ -164,6 +164,31 @@ function Set-ShopifyStagingTableUpdateFlag {
     Invoke-EBSSQL -SQLCommand $Query
 }
 
+function Invoke-TervisShopifyOrderLinesInterface {
+    param (
+        [Parameter(Mandatory)]$Environment
+    )
 
+    Write-Progress -Activity "Syncing products to Shopify" -CurrentOperation "Setting environment variables"
+    Set-TervisEBSEnvironment -Name $Environment
+    Set-TervisShopifyEnvironment -Environment $Environment
 
-# FINAL
+    $ShopNames = @{
+        Delta = "ospreystoredev"
+        Epsilon = ""
+        Production = "tervisteststore01"
+    }
+
+    $OtherParams = @{
+        ShopName = $ShopNames[$Environment]
+        Locations = Get-ShopifyRestLocations -ShopName $ShopNames[$Environment]
+    }
+
+    $ShopifyOrders = Get-ShopifyOrders
+    $ConvertedOrders = $ShopifyOrders | ConvertTo-EBSOrderLines
+    $ConvertedOrders | Write-EBSOrderLines
+}
+
+function ConvertTo-EBSOrderLines {}
+ 
+function Write-EBSOrderLines {}
