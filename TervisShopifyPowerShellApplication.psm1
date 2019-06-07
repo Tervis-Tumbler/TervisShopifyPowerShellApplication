@@ -185,10 +185,70 @@ function Invoke-TervisShopifyOrderLinesInterface {
     }
 
     $ShopifyOrders = Get-ShopifyOrders
-    $ConvertedOrders = $ShopifyOrders | ConvertTo-EBSOrderLines
+    $ConvertedOrders = $ShopifyOrders | Convert-TervisShopifyOrderToEBSOrderLines
     $ConvertedOrders | Write-EBSOrderLines
 }
 
-function ConvertTo-EBSOrderLines {}
+function Convert-TervisShopifyOrderToEBSOrderLines {
+    param (
+        [Parameter(Mandatory,ValueFromPipeline)]$Order
+    )
+    begin {}
+    process {
+        # May need to adjust this for local time based on location 
+        $DateString = Get-Date -Date ([datetime]::Parse($Order.createdat).toLocalTime()) -Format yyyyMMdd_HHmmss
+        $StoreNumber = $Order.physicalLocation.name # Will be replaced with function to get actual store number
+        $ORIG_SYS_DOCUMENT = "$StoreNumber-$DateString"
+
+        $OrderLineNumber = 0
+        $Order.lineItems.edges.node | ForEach-Object {
+            $OrderLineNumber++
+            [PSCustomObject]@{
+                ORIG_SYS_DOCUMENT = $ORIG_SYS_DOCUMENT
+                ORIG_SYS_LINE_REF = "$OrderLineNumber"
+                ORIG_SYS_SHIPMENT_REF = ""
+                LINE_TYPE = "Tervis Bill Only with Inv Line"
+                INVENTORY_ITEM = "$($_.sku)"
+                ORDERED_QUANTITY = $_.quantity
+                ORDER_QUANTITY_UOM = "EA"
+                SHIP_FROM_ORG = "STO"
+                PRICE_LIST = ""
+                UNIT_LIST_PRICE = "$($_.originalUnitPriceSet.shopMoney.amount)"
+                UNIT_SELLING_PRICE = "$($_.originalUnitPriceSet.shopMoney.amount)"
+                CALCULATE_PRICE_FLAG = "P"
+                RETURN_REASON_CODE = ""
+                CUSTOMER_ITEM_ID_TYPE = ""
+                ATTRIBUTE1 = ""
+                ATTRIBUTE7 = ""
+                ATTRIBUTE13 = ""
+                ATTRIBUTE14 = ""
+                CREATION_DATE = "sysdate"
+                LAST_UPDATE_DATE = "sysdate"
+                SUBINVENTORY = "" # Needs function to get store code, e.g. FL1, FL2
+                EARLIEST_ACCEPTABLE_DATE = ""
+                LATEST_ACCEPTABLE_DATE = ""
+                GIFT_MESSAGE = ""
+                SIDE1_COLOR = ""
+                SIDE2_COLOR = ""
+                SIDE1_FONT = ""
+                SIDE2_FONT = ""
+                SIDE1_TEXT1 = ""
+                SIDE2_TEXT1 = ""
+                SIDE1_TEXT2 = ""
+                SIDE2_TEXT2 = ""
+                SIDE1_TEXT3 = ""
+                SIDE2_TEXT3 = ""
+                SIDE1_INITIALS = ""
+                SIDE2_INITIALS = ""
+                PROCESS_FLAG = "N"
+                SOURCE_NAME = "Shopify"
+                OPERATING_UNIT_NAME = "Tervis Operating Unit"
+                CREATED_BY_NAME = "SHOPIFY"
+                LAST_UPDATED_BY_NAME = "SHOPIFY"
+                ACCESSORY = ""
+            }
+        }
+    }
+}
  
 function Write-EBSOrderLines {}
