@@ -193,11 +193,15 @@ function Convert-TervisShopifyOrderToEBSOrderLines {
     param (
         [Parameter(Mandatory,ValueFromPipeline)]$Order
     )
-    begin {}
+    begin {
+        $LocationDefinitions = Get-TervisShopifyLocationDefinition
+    }
     process {
+        $LocationDefinition = $LocationDefinitions | Where-Object City -eq $Order.physicalLocation.city
         # May need to adjust this for local time based on location 
+        # Needs more unique number. Orders could come in at same second
         $DateString = Get-Date -Date ([datetime]::Parse($Order.createdat).toLocalTime()) -Format yyyyMMdd_HHmmss
-        $StoreNumber = $Order.physicalLocation.name # Will be replaced with function to get actual store number
+        $StoreNumber = $LocationDefinition.RMSStoreNumber
         $ORIG_SYS_DOCUMENT = "$StoreNumber-$DateString"
 
         $OrderLineNumber = 0
@@ -224,7 +228,7 @@ function Convert-TervisShopifyOrderToEBSOrderLines {
                 ATTRIBUTE14 = ""
                 CREATION_DATE = "sysdate"
                 LAST_UPDATE_DATE = "sysdate"
-                SUBINVENTORY = "" # Needs function to get store code, e.g. FL1, FL2
+                SUBINVENTORY = $LocationDefinition.SecondaryInventoryName
                 EARLIEST_ACCEPTABLE_DATE = ""
                 LATEST_ACCEPTABLE_DATE = ""
                 GIFT_MESSAGE = ""
