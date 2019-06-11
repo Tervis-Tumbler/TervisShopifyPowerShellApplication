@@ -197,18 +197,19 @@ function Convert-TervisShopifyOrderToEBSOrderLines {
         $LocationDefinitions = Get-TervisShopifyLocationDefinition
     }
     process {
-        $LocationDefinition = $LocationDefinitions | Where-Object City -eq $Order.physicalLocation.city
+        $LocationDefinition = $LocationDefinitions | Where-Object City -eq $Order.physicalLocation.address.city
         # May need to adjust this for local time based on location 
         # Needs more unique number. Orders could come in at same second
-        $DateString = Get-Date -Date ([datetime]::Parse($Order.createdat).toLocalTime()) -Format yyyyMMdd_HHmmss
+        # $DateString = Get-Date -Date ([datetime]::Parse($Order.createdat).toLocalTime()) -Format yyyyMMdd_HHmmss_ffff
+        $OrderId = $Order.id | Get-ShopifyIdFromShopifyGid
         $StoreNumber = $LocationDefinition.RMSStoreNumber
-        $ORIG_SYS_DOCUMENT = "$StoreNumber-$DateString"
-
+        # $ORIG_SYS_DOCUMENT = "$StoreNumber-$DateString"
+        $ORIG_SYS_DOCUMENT_REF = "$StoreNumber-$OrderId"
         $OrderLineNumber = 0
         $Order.lineItems.edges.node | ForEach-Object {
             $OrderLineNumber++
             [PSCustomObject]@{
-                ORIG_SYS_DOCUMENT = $ORIG_SYS_DOCUMENT
+                ORIG_SYS_DOCUMENT_REF = $ORIG_SYS_DOCUMENT_REF
                 ORIG_SYS_LINE_REF = "$OrderLineNumber"
                 ORIG_SYS_SHIPMENT_REF = ""
                 LINE_TYPE = "Tervis Bill Only with Inv Line"
