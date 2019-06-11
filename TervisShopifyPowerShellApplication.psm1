@@ -1,4 +1,3 @@
-# TESTING 
 function Invoke-TervisShopifyInterfaceItemUpdate {
     param (
         [Parameter(Mandatory)][ValidateSet("Delta","Epsilon","Production")]$Environment
@@ -184,6 +183,8 @@ function Invoke-TervisShopifyOrderLinesInterface {
         Locations = Get-ShopifyRestLocations -ShopName $ShopNames[$Environment]
     }
 
+    # Need something to determine the last time an order was retrieved,
+    # then retrieve all the orders from that point forward
     $ShopifyOrders = Get-ShopifyOrders
     $ConvertedOrders = $ShopifyOrders | Convert-TervisShopifyOrderToEBSOrderLines
     $ConvertedOrders | Write-EBSOrderLines
@@ -218,8 +219,8 @@ function Convert-TervisShopifyOrderToEBSOrderLines {
                 ORDER_QUANTITY_UOM = "EA"
                 SHIP_FROM_ORG = "STO"
                 PRICE_LIST = ""
-                UNIT_LIST_PRICE = "$($_.originalUnitPriceSet.shopMoney.amount)"
-                UNIT_SELLING_PRICE = "$($_.originalUnitPriceSet.shopMoney.amount)"
+                UNIT_LIST_PRICE = $($_.originalUnitPriceSet.shopMoney.amount)
+                UNIT_SELLING_PRICE = $($_.originalUnitPriceSet.shopMoney.amount)
                 CALCULATE_PRICE_FLAG = "P"
                 RETURN_REASON_CODE = ""
                 CUSTOMER_ITEM_ID_TYPE = ""
@@ -256,4 +257,71 @@ function Convert-TervisShopifyOrderToEBSOrderLines {
     }
 }
  
-function Write-EBSOrderLines {}
+function Write-EBSOrderLine {
+    param (
+        [Parameter(Mandatory,ValueFromPipeline)]$ConvertedOrder
+    )
+    # Need something to check we're not writing over the same order again?
+    begin {}
+    process {
+        $Query = @"
+            INSERT INTO xxoe_lines_iface_all
+            (
+                ORIG_SYS_DOCUMENT_REF, ORIG_SYS_LINE_REF, ORIG_SYS_SHIPMENT_REF, LINE_TYPE, INVENTORY_ITEM, 
+                ORDERED_QUANTITY, ORDER_QUANTITY_UOM, SHIP_FROM_ORG, PRICE_LIST, UNIT_LIST_PRICE, UNIT_SELLING_PRICE, 
+                CALCULATE_PRICE_FLAG, RETURN_REASON_CODE, CUSTOMER_ITEM_ID_TYPE, ATTRIBUTE1, ATTRIBUTE7, ATTRIBUTE13, 
+                ATTRIBUTE14, CREATION_DATE, LAST_UPDATE_DATE, SUBINVENTORY, EARLIEST_ACCEPTABLE_DATE, LATEST_ACCEPTABLE_DATE, 
+                GIFT_MESSAGE, SIDE1_COLOR, SIDE2_COLOR, SIDE1_FONT, SIDE2_FONT, SIDE1_TEXT1, SIDE2_TEXT1, SIDE1_TEXT2, 
+                SIDE2_TEXT2, SIDE1_TEXT3, SIDE2_TEXT3, SIDE1_INITIALS, SIDE2_INITIALS, PROCESS_FLAG, SOURCE_NAME, 
+                OPERATING_UNIT_NAME, CREATED_BY_NAME, LAST_UPDATED_BY_NAME, ACCESSORY
+            )
+            VALUES
+            (
+                '$($ConvertedOrder.ORIG_SYS_DOCUMENT_REF)',
+                '$($ConvertedOrder.ORIG_SYS_LINE_REF)',
+                '$($ConvertedOrder.ORIG_SYS_SHIPMENT_REF)',
+                '$($ConvertedOrder.LINE_TYPE)',
+                '$($ConvertedOrder.INVENTORY_ITEM)',
+                '$($ConvertedOrder.ORDERED_QUANTITY)',
+                '$($ConvertedOrder.ORDER_QUANTITY_UOM)',
+                '$($ConvertedOrder.SHIP_FROM_ORG)',
+                '$($ConvertedOrder.PRICE_LIST)',
+                $($ConvertedOrder.UNIT_LIST_PRICE),
+                $($ConvertedOrder.UNIT_SELLING_PRICE),
+                '$($ConvertedOrder.CALCULATE_PRICE_FLAG)',
+                '$($ConvertedOrder.RETURN_REASON_CODE)',
+                '$($ConvertedOrder.CUSTOMER_ITEM_ID_TYPE)',
+                '$($ConvertedOrder.ATTRIBUTE1)',
+                '$($ConvertedOrder.ATTRIBUTE7)',
+                '$($ConvertedOrder.ATTRIBUTE13)',
+                '$($ConvertedOrder.ATTRIBUTE14)',
+                $($ConvertedOrder.CREATION_DATE),
+                $($ConvertedOrder.LAST_UPDATE_DATE),
+                '$($ConvertedOrder.SUBINVENTORY)',
+                '$($ConvertedOrder.EARLIEST_ACCEPTABLE_DATE)',
+                '$($ConvertedOrder.LATEST_ACCEPTABLE_DATE)',
+                '$($ConvertedOrder.GIFT_MESSAGE)',
+                '$($ConvertedOrder.SIDE1_COLOR)',
+                '$($ConvertedOrder.SIDE2_COLOR)',
+                '$($ConvertedOrder.SIDE1_FONT)',
+                '$($ConvertedOrder.SIDE2_FONT)',
+                '$($ConvertedOrder.SIDE1_TEXT1)',
+                '$($ConvertedOrder.SIDE2_TEXT1)',
+                '$($ConvertedOrder.SIDE1_TEXT2)',
+                '$($ConvertedOrder.SIDE2_TEXT2)',
+                '$($ConvertedOrder.SIDE1_TEXT3)',
+                '$($ConvertedOrder.SIDE2_TEXT3)',
+                '$($ConvertedOrder.SIDE1_INITIALS)',
+                '$($ConvertedOrder.SIDE2_INITIALS)',
+                '$($ConvertedOrder.PROCESS_FLAG)',
+                '$($ConvertedOrder.SOURCE_NAME)',
+                '$($ConvertedOrder.OPERATING_UNIT_NAME)',
+                '$($ConvertedOrder.CREATED_BY_NAME)',
+                '$($ConvertedOrder.LAST_UPDATED_BY_NAME)',
+                '$($ConvertedOrder.ACCESSORY)'
+            )
+"@
+            
+    }
+
+}
