@@ -263,7 +263,7 @@ function Write-EBSOrderLine {
     )
     # Need something to check we're not writing over the same order again?
     begin {}
-    process {
+    process {       
         $Query = @"
             INSERT INTO xxoe_lines_iface_all
             (
