@@ -187,7 +187,9 @@ function Invoke-TervisShopifyOrderLinesInterface {
     # then retrieve all the orders from that point forward
     $ShopifyOrders = Get-ShopifyOrders
     $ConvertedOrders = $ShopifyOrders | Convert-TervisShopifyOrderToEBSOrderLines
-    $ConvertedOrders | Write-EBSOrderLines
+    $ConvertedOrders | Write-EBSOrderLine
+    $ConvertedOrders | Write-EBSOrderLineHeaders
+
 }
 
 function Convert-TervisShopifyOrderToEBSOrderLines {
@@ -256,7 +258,64 @@ function Convert-TervisShopifyOrderToEBSOrderLines {
         }
     }
 }
- 
+
+function Convert-TervisShopifyOrderToEBSOrderLineHeaders {
+    param (
+        [Parameter(Mandatory,ValueFromPipeline)]$Order
+    )
+    begin {
+        $LocationDefinitions = Get-TervisShopifyLocationDefinition
+    }
+    process {
+        $LocationDefinition = $LocationDefinitions | Where-Object City -eq $Order.physicalLocation.address.city
+        $OrderId = $Order.id | Get-ShopifyIdFromShopifyGid
+        $StoreNumber = $LocationDefinition.RMSStoreNumber
+        $ORIG_SYS_DOCUMENT_REF = "$StoreNumber-$OrderId"
+        $OrderLineNumber = 0
+
+        $Order.lineItems.edges.node | ForEach-Object {
+            $OrderLineNumber++
+            [PSCustomObject]@{
+                ORIG_SYS_DOCUMENT_REF = $ORIG_SYS_DOCUMENT_REF
+                ORDERED_DATE = "TO_DATE('$($Order.createdAt)', 'YYYY-MM-DD`"T`"HH24:MI:SS`"Z`"')"
+                ORDER_TYPE = "Store Order"
+                PRICE_LIST = ""
+                SALESREP = ""
+                PAYMENT_TERM = ""
+                SHIPMENT_PRIORITY_CODE = ""
+                SHIPPING_METHOD_CODE = ""
+                SHIPMENT_PRIORITY = ""
+                SHIPPING_INSTRUCTIONS = ""
+                CUSTOMER_PO_NUMBER = ""
+                SHIP_FROM_ORG = "ORG"
+                SHIP_TO_ORG = ""
+                INVOICE_TO_ORG = ""
+                CUSTOMER_NUMBER = ""
+                BOOKED_FLAG = "Y"
+                ATTRIBUTE8 = ""
+                CREATION_DATE = "sysdate"
+                LAST_UPDATE_DATE = "sysdate"
+                ORIG_SYS_CUSTOMER_REF = $ORIG_SYS_DOCUMENT_REF
+                ORIG_SHIP_ADDRESS_REF = $ORIG_SYS_DOCUMENT_REF
+                ORIG_BILL_ADDRESS_REF = $ORIG_SYS_DOCUMENT_REF
+                SHIP_TO_CONTACT_REF = $ORIG_SYS_DOCUMENT_REF
+                BILL_TO_CONTACT_REF = $ORIG_SYS_DOCUMENT_REF
+                GIFT_MESSAGE = ""
+                CUSTOMER_REQUESTED_DATE = ""
+                CARRIER_NAME = ""
+                CARRIER_SERVICE_LEVEL = ""
+                CARRIER_RESIDENTIAL_DELIVERY = ""
+                ATTRIBUTE6 = ""
+                PROCESS_FLAG = "N"
+                SOURCE_NAME = "SHOPIFY"
+                OPERATING_UNIT_NAME = "Tervis Operating Unit"
+                CREATED_BY_NAME = "SHOPIFY"
+                LAST_UPDATED_BY_NAME = "SHOPIFY"
+            }
+        }
+    }
+}
+
 function Write-EBSOrderLine {
     param (
         [Parameter(Mandatory,ValueFromPipeline)]$ConvertedOrder
@@ -282,7 +341,7 @@ function Write-EBSOrderLine {
                 '$($ConvertedOrder.ORIG_SYS_SHIPMENT_REF)',
                 '$($ConvertedOrder.LINE_TYPE)',
                 '$($ConvertedOrder.INVENTORY_ITEM)',
-                '$($ConvertedOrder.ORDERED_QUANTITY)',
+                $($ConvertedOrder.ORDERED_QUANTITY),
                 '$($ConvertedOrder.ORDER_QUANTITY_UOM)',
                 '$($ConvertedOrder.SHIP_FROM_ORG)',
                 '$($ConvertedOrder.PRICE_LIST)',
@@ -324,4 +383,65 @@ function Write-EBSOrderLine {
             
     }
 
+}
+
+function Write-EBSOrderLineHeaders {
+    param (
+        [Parameter(Mandatory,ValueFromPipeline)]$ConvertedOrder
+    )
+
+    process {
+        $Query = @"
+        INSERT INTO xxoe_headers_iface_all
+        (
+            ORIG_SYS_DOCUMENT_REF, ORDERED_DATE, ORDER_TYPE, PRICE_LIST, SALESREP, 
+            PAYMENT_TERM, SHIPMENT_PRIORITY_CODE, SHIPPING_METHOD_CODE, SHIPMENT_PRIORITY, 
+            SHIPPING_INSTRUCTIONS, CUSTOMER_PO_NUMBER, SHIP_FROM_ORG, SHIP_TO_ORG, 
+            INVOICE_TO_ORG, CUSTOMER_NUMBER, BOOKED_FLAG, ATTRIBUTE8, CREATION_DATE, 
+            LAST_UPDATE_DATE, ORIG_SYS_CUSTOMER_REF, ORIG_SHIP_ADDRESS_REF, 
+            ORIG_BILL_ADDRESS_REF, SHIP_TO_CONTACT_REF, BILL_TO_CONTACT_REF, 
+            GIFT_MESSAGE, CUSTOMER_REQUESTED_DATE, CARRIER_NAME, CARRIER_SERVICE_LEVEL, 
+            CARRIER_RESIDENTIAL_DELIVERY, ATTRIBUTE6, PROCESS_FLAG, SOURCE_NAME, 
+            OPERATING_UNIT_NAME, CREATED_BY_NAME, LAST_UPDATED_BY_NAME
+        )
+        VALUES
+        (
+            '$($ConvertedOrder.ORIG_SYS_DOCUMENT_REF)',
+            $($ConvertedOrder.ORDERED_DATE),
+            '$($ConvertedOrder.ORDER_TYPE)',
+            '$($ConvertedOrder.PRICE_LIST)',
+            '$($ConvertedOrder.SALESREP)',
+            '$($ConvertedOrder.PAYMENT_TERM)',
+            '$($ConvertedOrder.SHIPMENT_PRIORITY_CODE)',
+            '$($ConvertedOrder.SHIPPING_METHOD_CODE)',
+            '$($ConvertedOrder.SHIPMENT_PRIORITY)',
+            '$($ConvertedOrder.SHIPPING_INSTRUCTIONS)',
+            '$($ConvertedOrder.CUSTOMER_PO_NUMBER)',
+            '$($ConvertedOrder.SHIP_FROM_ORG)',
+            '$($ConvertedOrder.SHIP_TO_ORG)',
+            '$($ConvertedOrder.INVOICE_TO_ORG)',
+            '$($ConvertedOrder.CUSTOMER_NUMBER)',
+            '$($ConvertedOrder.BOOKED_FLAG)',
+            '$($ConvertedOrder.ATTRIBUTE8)',
+            $($ConvertedOrder.CREATION_DATE),
+            $($ConvertedOrder.LAST_UPDATE_DATE),
+            '$($ConvertedOrder.ORIG_SYS_CUSTOMER_REF)',
+            '$($ConvertedOrder.ORIG_SHIP_ADDRESS_REF)',
+            '$($ConvertedOrder.ORIG_BILL_ADDRESS_REF)',
+            '$($ConvertedOrder.SHIP_TO_CONTACT_REF)',
+            '$($ConvertedOrder.BILL_TO_CONTACT_REF)',
+            '$($ConvertedOrder.GIFT_MESSAGE)',
+            '$($ConvertedOrder.CUSTOMER_REQUESTED_DATE)',
+            '$($ConvertedOrder.CARRIER_NAME)',
+            '$($ConvertedOrder.CARRIER_SERVICE_LEVEL)',
+            '$($ConvertedOrder.CARRIER_RESIDENTIAL_DELIVERY)',
+            '$($ConvertedOrder.ATTRIBUTE6)',
+            '$($ConvertedOrder.PROCESS_FLAG)',
+            '$($ConvertedOrder.SOURCE_NAME)',
+            '$($ConvertedOrder.OPERATING_UNIT_NAME)',
+            '$($ConvertedOrder.CREATED_BY_NAME)',
+            '$($ConvertedOrder.LAST_UPDATED_BY_NAME)'
+        )
+"@
+    }
 }
