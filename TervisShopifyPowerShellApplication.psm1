@@ -186,9 +186,10 @@ function Invoke-TervisShopifyOrderLinesInterface {
     # Need something to determine the last time an order was retrieved,
     # then retrieve all the orders from that point forward
     $ShopifyOrders = Get-ShopifyOrders
-    $ConvertedOrders = $ShopifyOrders | Convert-TervisShopifyOrderToEBSOrderLines
-    $ConvertedOrders | Write-EBSOrderLine
-    $ConvertedOrders | Write-EBSOrderLineHeaders
+    $ConvertedOrderLines = $ShopifyOrders | Convert-TervisShopifyOrderToEBSOrderLines
+    $ConvertedOrderHeaders = $ShopifyOrders | Convert-TervisShopifyOrderToEBSOrderLineHeaders
+    $ConvertedOrderLines | Write-EBSOrderLine
+    $ConvertedOrderHeaders | Write-EBSOrderLineHeader # Currently does not work
 
 }
 
@@ -249,7 +250,7 @@ function Convert-TervisShopifyOrderToEBSOrderLines {
                 SIDE1_INITIALS = ""
                 SIDE2_INITIALS = ""
                 PROCESS_FLAG = "N"
-                SOURCE_NAME = "Shopify"
+                SOURCE_NAME = "RMS"
                 OPERATING_UNIT_NAME = "Tervis Operating Unit"
                 CREATED_BY_NAME = "SHOPIFY"
                 LAST_UPDATED_BY_NAME = "SHOPIFY"
@@ -270,6 +271,7 @@ function Convert-TervisShopifyOrderToEBSOrderLineHeaders {
         $LocationDefinition = $LocationDefinitions | Where-Object City -eq $Order.physicalLocation.address.city
         $OrderId = $Order.id | Get-ShopifyIdFromShopifyGid
         $StoreNumber = $LocationDefinition.RMSStoreNumber
+        $StoreCustomerNumber = $LocationDefinition.CustomerNumber
         $ORIG_SYS_DOCUMENT_REF = "$StoreNumber-$OrderId"
         $OrderLineNumber = 0
 
@@ -290,16 +292,16 @@ function Convert-TervisShopifyOrderToEBSOrderLineHeaders {
                 SHIP_FROM_ORG = "ORG"
                 SHIP_TO_ORG = ""
                 INVOICE_TO_ORG = ""
-                CUSTOMER_NUMBER = ""
+                CUSTOMER_NUMBER = $StoreCustomerNumber
                 BOOKED_FLAG = "Y"
                 ATTRIBUTE8 = ""
                 CREATION_DATE = "sysdate"
                 LAST_UPDATE_DATE = "sysdate"
-                ORIG_SYS_CUSTOMER_REF = $ORIG_SYS_DOCUMENT_REF
-                ORIG_SHIP_ADDRESS_REF = $ORIG_SYS_DOCUMENT_REF
-                ORIG_BILL_ADDRESS_REF = $ORIG_SYS_DOCUMENT_REF
-                SHIP_TO_CONTACT_REF = $ORIG_SYS_DOCUMENT_REF
-                BILL_TO_CONTACT_REF = $ORIG_SYS_DOCUMENT_REF
+                ORIG_SYS_CUSTOMER_REF = ""
+                ORIG_SHIP_ADDRESS_REF = ""
+                ORIG_BILL_ADDRESS_REF = ""
+                SHIP_TO_CONTACT_REF = ""
+                BILL_TO_CONTACT_REF = ""
                 GIFT_MESSAGE = ""
                 CUSTOMER_REQUESTED_DATE = ""
                 CARRIER_NAME = ""
@@ -307,7 +309,7 @@ function Convert-TervisShopifyOrderToEBSOrderLineHeaders {
                 CARRIER_RESIDENTIAL_DELIVERY = ""
                 ATTRIBUTE6 = ""
                 PROCESS_FLAG = "N"
-                SOURCE_NAME = "SHOPIFY"
+                SOURCE_NAME = "RMS"
                 OPERATING_UNIT_NAME = "Tervis Operating Unit"
                 CREATED_BY_NAME = "SHOPIFY"
                 LAST_UPDATED_BY_NAME = "SHOPIFY"
@@ -380,12 +382,12 @@ function Write-EBSOrderLine {
                 '$($ConvertedOrder.ACCESSORY)'
             )
 "@
-            
+        Invoke-EBSSQL -SQLCommand $Query
     }
 
 }
 
-function Write-EBSOrderLineHeaders {
+function Write-EBSOrderLineHeader {
     param (
         [Parameter(Mandatory,ValueFromPipeline)]$ConvertedOrder
     )
@@ -443,5 +445,6 @@ function Write-EBSOrderLineHeaders {
             '$($ConvertedOrder.LAST_UPDATED_BY_NAME)'
         )
 "@
+        Invoke-EBSSQL -SQLCommand $Query
     }
 }
