@@ -188,9 +188,9 @@ function Invoke-TervisShopifyOrderLinesInterface {
     $ShopifyOrders = Get-ShopifyOrders
     $ConvertedOrderLines = $ShopifyOrders | Convert-TervisShopifyOrderToEBSOrderLines
     $ConvertedOrderHeaders = $ShopifyOrders | Convert-TervisShopifyOrderToEBSOrderLineHeaders
-    $ConvertedOrderLines | Write-EBSOrderLine
-    $ConvertedOrderHeaders | Write-EBSOrderLineHeader # Currently does not work
-
+    $Subqueries = $ConvertedOrderLines | New-EBSOrderLineSubquery
+    $Subqueries += $ConvertedOrderHeaders | New-EBSOrderLineHeaderSubquery
+    $Subqueries | Invoke-EBSSubqueryInsert
 }
 
 function Convert-TervisShopifyOrderToEBSOrderLines {
@@ -318,7 +318,7 @@ function Convert-TervisShopifyOrderToEBSOrderLineHeaders {
     }
 }
 
-function Write-EBSOrderLine {
+function New-EBSOrderLineSubquery {
     param (
         [Parameter(Mandatory,ValueFromPipeline)]$ConvertedOrder
     )
@@ -326,7 +326,7 @@ function Write-EBSOrderLine {
     begin {}
     process {       
         $Query = @"
-            INSERT INTO xxoe_lines_iface_all
+            INTO xxoe_lines_iface_all
             (
                 ORIG_SYS_DOCUMENT_REF, ORIG_SYS_LINE_REF, ORIG_SYS_SHIPMENT_REF, LINE_TYPE, INVENTORY_ITEM, 
                 ORDERED_QUANTITY, ORDER_QUANTITY_UOM, SHIP_FROM_ORG, PRICE_LIST, UNIT_LIST_PRICE, UNIT_SELLING_PRICE, 
@@ -382,19 +382,19 @@ function Write-EBSOrderLine {
                 '$($ConvertedOrder.ACCESSORY)'
             )
 "@
-        Invoke-EBSSQL -SQLCommand $Query
+        return $Query
     }
 
 }
 
-function Write-EBSOrderLineHeader {
+function New-EBSOrderLineHeaderSubquery {
     param (
         [Parameter(Mandatory,ValueFromPipeline)]$ConvertedOrder
     )
 
     process {
         $Query = @"
-        INSERT INTO xxoe_headers_iface_all
+        INTO xxoe_headers_iface_all
         (
             ORIG_SYS_DOCUMENT_REF, ORDERED_DATE, ORDER_TYPE, PRICE_LIST, SALESREP, 
             PAYMENT_TERM, SHIPMENT_PRIORITY_CODE, SHIPPING_METHOD_CODE, SHIPMENT_PRIORITY, 
@@ -445,6 +445,22 @@ function Write-EBSOrderLineHeader {
             '$($ConvertedOrder.LAST_UPDATED_BY_NAME)'
         )
 "@
-        Invoke-EBSSQL -SQLCommand $Query
+        return $Query
+    }
+}
+
+function Invoke-EBSSubqueryInsert {
+    param (
+        [Parameter(Mandatory,ValueFromPipeline)]$Subquery
+    )
+    begin {
+        $FinalQuery = "INSERT ALL"
+    }
+    process {
+        $FinalQuery += "`n$Subquery"
+    }
+    end {
+        $FinalQuery += "`nSELECT 1 FROM DUAL"
+        Invoke-EBSSQL -SQLCommand $FinalQuery
     }
 }
