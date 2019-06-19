@@ -183,14 +183,16 @@ function Invoke-TervisShopifyOrderLinesInterface {
         Locations = Get-ShopifyRestLocations -ShopName $ShopNames[$Environment]
     }
 
-    # Need something to determine the last time an order was retrieved,
-    # then retrieve all the orders from that point forward
-    $ShopifyOrders = Get-ShopifyOrders
-    $ConvertedOrderLines = $ShopifyOrders | Convert-TervisShopifyOrderToEBSOrderLines
-    $ConvertedOrderHeaders = $ShopifyOrders | Convert-TervisShopifyOrderToEBSOrderLineHeaders
-    $Subqueries = $ConvertedOrderLines | New-EBSOrderLineSubquery
-    $Subqueries += $ConvertedOrderHeaders | New-EBSOrderLineHeaderSubquery
-    $Subqueries | Invoke-EBSSubqueryInsert
+    try {
+        $ShopifyOrders = Get-TervisShopifyOrdersNotTaggedWithEBS -ShopName $OtherParams.ShopName
+        $ConvertedOrderLines = $ShopifyOrders | Convert-TervisShopifyOrderToEBSOrderLines
+        $ConvertedOrderHeaders = $ShopifyOrders | Convert-TervisShopifyOrderToEBSOrderLineHeaders
+        $Subqueries = $ConvertedOrderLines | New-EBSOrderLineSubquery
+        $Subqueries += $ConvertedOrderHeaders | New-EBSOrderLineHeaderSubquery
+        $Subqueries | Invoke-EBSSubqueryInsert
+    } catch {
+        $_
+    }
 }
 
 function Convert-TervisShopifyOrderToEBSOrderLines {
