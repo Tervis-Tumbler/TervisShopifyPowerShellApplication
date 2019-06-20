@@ -168,29 +168,33 @@ function Invoke-TervisShopifyOrderLinesInterface {
         [Parameter(Mandatory)]$Environment
     )
 
-    Write-Progress -Activity "Syncing products to Shopify" -CurrentOperation "Setting environment variables"
+    Write-Progress -Activity "Shopify Sales Batch Interface" -CurrentOperation "Setting environment variables"
     Set-TervisEBSEnvironment -Name $Environment
-    Set-TervisShopifyEnvironment -Environment $Environment
+    Set-TervisShopifyEnvironment -Environment Production #$Environment
 
-    $ShopNames = @{
-        Delta = "ospreystoredev"
-        Epsilon = ""
-        Production = "tervisteststore01"
-    }
-
-    $OtherParams = @{
-        ShopName = $ShopNames[$Environment]
-        Locations = Get-ShopifyRestLocations -ShopName $ShopNames[$Environment]
+    $ShopName = switch ($Environment) {
+        "Delta" {"tervisteststore01"; break} #OspreyStoreDev
+        "Epsilon" {""; break}
+        "Production" {"tervisteststore01"; break}
+        default {throw "Environment not recognized"}
     }
 
     try {
-        $ShopifyOrders = Get-TervisShopifyOrdersNotTaggedWithEBS -ShopName $OtherParams.ShopName
+        Write-Progress -Activity "Shopify Sales Batch Interface" -CurrentOperation "Getting orders"
+        $ShopifyOrders = Get-TervisShopifyOrdersNotTaggedWithEBS -ShopName $ShopName
+        Write-Progress -Activity "Shopify Sales Batch Interface" -CurrentOperation "Converting orders to EBS format"
         $ConvertedOrderLines = $ShopifyOrders | Convert-TervisShopifyOrderToEBSOrderLines
         $ConvertedOrderHeaders = $ShopifyOrders | Convert-TervisShopifyOrderToEBSOrderLineHeaders
         $Subqueries = $ConvertedOrderLines | New-EBSOrderLineSubquery
         $Subqueries += $ConvertedOrderHeaders | New-EBSOrderLineHeaderSubquery
+        Write-Progress -Activity "Shopify Sales Batch Interface" -CurrentOperation "Sending orders to EBS"
         $Subqueries | Invoke-EBSSubqueryInsert
+        Write-Progress -Activity "Shopify Sales Batch Interface" -CurrentOperation "Tagging orders sent to EBS"
+        $ShopifyOrders | Set-ShopifyOrderTag -ShopName $ShopName -AddTag "SentToEBS"
     } catch {
+        # Need to improve error handling, possibly isolate the order tagging
+        # process so that an internet hiccup doesn't retrigger all the orders
+        # at a later time.
         $_
     }
 }
