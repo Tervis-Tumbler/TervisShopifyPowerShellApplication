@@ -170,11 +170,10 @@ function Invoke-TervisShopifyOrderLinesInterface {
 
     Write-Progress -Activity "Shopify Sales Batch Interface" -CurrentOperation "Setting environment variables"
     Set-TervisEBSEnvironment -Name $Environment
-    Set-TervisShopifyEnvironment -Environment Production #$Environment
+    Set-TervisShopifyEnvironment -Environment $Environment
 
     $ShopName = switch ($Environment) {
-        "Delta" {"tervisteststore01"; break} #OspreyStoreDev
-        "Epsilon" {""; break}
+        "Delta" {"ospreystoredev"; break}
         "Production" {"tervisteststore01"; break}
         default {throw "Environment not recognized"}
     }
@@ -261,6 +260,7 @@ function Convert-TervisShopifyOrderToEBSOrderLines {
                 CREATED_BY_NAME = "SHOPIFY"
                 LAST_UPDATED_BY_NAME = "SHOPIFY"
                 ACCESSORY = ""
+                TAX_VALUE = $_.taxLines.priceSet.shopMoney.amount | Measure-Object -Sum | Select-Object -ExpandProperty Sum
             }
         }
     }
@@ -340,7 +340,7 @@ function New-EBSOrderLineSubquery {
                 ATTRIBUTE14, CREATION_DATE, LAST_UPDATE_DATE, SUBINVENTORY, EARLIEST_ACCEPTABLE_DATE, LATEST_ACCEPTABLE_DATE, 
                 GIFT_MESSAGE, SIDE1_COLOR, SIDE2_COLOR, SIDE1_FONT, SIDE2_FONT, SIDE1_TEXT1, SIDE2_TEXT1, SIDE1_TEXT2, 
                 SIDE2_TEXT2, SIDE1_TEXT3, SIDE2_TEXT3, SIDE1_INITIALS, SIDE2_INITIALS, PROCESS_FLAG, SOURCE_NAME, 
-                OPERATING_UNIT_NAME, CREATED_BY_NAME, LAST_UPDATED_BY_NAME, ACCESSORY
+                OPERATING_UNIT_NAME, CREATED_BY_NAME, LAST_UPDATED_BY_NAME, ACCESSORY, TAX_VALUE
             )
             VALUES
             (
@@ -385,7 +385,8 @@ function New-EBSOrderLineSubquery {
                 '$($ConvertedOrder.OPERATING_UNIT_NAME)',
                 '$($ConvertedOrder.CREATED_BY_NAME)',
                 '$($ConvertedOrder.LAST_UPDATED_BY_NAME)',
-                '$($ConvertedOrder.ACCESSORY)'
+                '$($ConvertedOrder.ACCESSORY)',
+                '$($ConvertedOrder.TAX_VALUE)'
             )
 "@
         return $Query
