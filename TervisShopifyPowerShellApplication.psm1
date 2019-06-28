@@ -202,17 +202,12 @@ function Convert-TervisShopifyOrderToEBSOrderLines {
     param (
         [Parameter(Mandatory,ValueFromPipeline)]$Order
     )
-    begin {
-        $LocationDefinitions = Get-TervisShopifyLocationDefinition
-    }
     process {
-        $LocationDefinition = $LocationDefinitions | Where-Object City -eq $Order.physicalLocation.address.city
+        $LocationDefinition = Get-TervisShopifyLocationDefinition -City $Order.physicalLocation.address.city
         # May need to adjust this for local time based on location 
-        # Needs more unique number. Orders could come in at same second
         # $DateString = Get-Date -Date ([datetime]::Parse($Order.createdat).toLocalTime()) -Format yyyyMMdd_HHmmss_ffff
         $OrderId = $Order.id | Get-ShopifyIdFromShopifyGid
         $StoreNumber = $LocationDefinition.RMSStoreNumber
-        # $ORIG_SYS_DOCUMENT = "$StoreNumber-$DateString"
         $ORIG_SYS_DOCUMENT_REF = "$StoreNumber-$OrderId"
         $OrderLineNumber = 0
         $Order.lineItems.edges.node | ForEach-Object {
@@ -270,11 +265,8 @@ function Convert-TervisShopifyOrderToEBSOrderLineHeaders {
     param (
         [Parameter(Mandatory,ValueFromPipeline)]$Order
     )
-    begin {
-        $LocationDefinitions = Get-TervisShopifyLocationDefinition
-    }
     process {
-        $LocationDefinition = $LocationDefinitions | Where-Object City -eq $Order.physicalLocation.address.city
+        $LocationDefinition = Get-TervisShopifyLocationDefinition -City $Order.physicalLocation.address.city
         $OrderId = $Order.id | Get-ShopifyIdFromShopifyGid
         $StoreNumber = $LocationDefinition.RMSStoreNumber
         $StoreCustomerNumber = $LocationDefinition.CustomerNumber
@@ -320,6 +312,47 @@ function Convert-TervisShopifyOrderToEBSOrderLineHeaders {
                 CREATED_BY_NAME = "SHOPIFY"
                 LAST_UPDATED_BY_NAME = "SHOPIFY"
             }
+        }
+    }
+}
+
+function Convert-TervisShopifyPaymentsToEBSPayment {
+    param (
+        [Parameter(Mandatory,ValueFromPipeline)]$Order,
+        [Parameter(Mandatory)]$ShopName
+    )
+    process {
+        $Transaction = $Order | Get-ShopifyRestOrderTransactionDetail -ShopName $ShopName
+        $LocationDefinition = Get-TervisShopifyLocationDefinition -City $Order.physicalLocation.address.city
+        $OrderId = $Order.id | Get-ShopifyIdFromShopifyGid
+        $StoreNumber = $LocationDefinition.RMSStoreNumber
+        $StoreCustomerNumber = $LocationDefinition.CustomerNumber
+        $ORIG_SYS_DOCUMENT_REF = "$StoreNumber-$OrderId"
+
+        
+
+        [PSCustomObject]@{
+            ORDER_SOURCE_ID = "1101"
+            ORIG_SYS_DOCUMENT_REF = $ORIG_SYS_DOCUMENT_REF
+            ORIG_SYS_PAYMENT_REF = $Transaction.id
+            PAYMENT_TYPE_CODE = ''
+            PAYMENT_COLLECTION_EVENT = ''
+            CREDIT_CARD_NUMBER = ''
+            CREDIT_CARD_HOLDER_NAME = ''
+            CREDIT_CARD_CODE = ''
+            CREDIT_CARD_APPROVAL_CODE = ''
+            CREDIT_CARD_APPROVAL_DATE = ''
+            PAYMENT_AMOUNT = ''
+            CREATION_DATE = ''
+            LAST_UPDATE_DATE = ''
+            CREDIT_CARD_EXPIRATION_MONTH = ''
+            CREDIT_CARD_EXPIRATION_YEAR = ''
+            CREDIT_CARD_PAYMENT_STATUS = ''
+            PROCESS_FLAG = ''
+            SOURCE_NAME = ''
+            OPERATING_UNIT_NAME = ''
+            CREATED_BY_NAME = ''
+            LAST_UPDATED_BY_NAME = ''
         }
     }
 }
