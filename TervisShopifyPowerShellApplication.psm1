@@ -328,33 +328,85 @@ function Convert-TervisShopifyPaymentsToEBSPayment {
         $StoreNumber = $LocationDefinition.RMSStoreNumber
         $StoreCustomerNumber = $LocationDefinition.CustomerNumber
         $ORIG_SYS_DOCUMENT_REF = "$StoreNumber-$OrderId"
+        $PaymentTypeCode = $Transaction | Get-TervisShopifyPaymentTypeCode
+        $PaymentCollectionEvent = $Transaction | Get-TervisShopifyPaymentCollectionEvent
+        $CreditCardNumber = $Transaction | New-TervisShopifyCCDummyNumber
+        $CreditCardApprovalDate = if ($CreditCardNumber) {$Transaction.processed_at | ConvertTo-TervisShopifyOracleSqlUtcDateString}
 
-        
 
         [PSCustomObject]@{
             ORDER_SOURCE_ID = "1101"
             ORIG_SYS_DOCUMENT_REF = $ORIG_SYS_DOCUMENT_REF
             ORIG_SYS_PAYMENT_REF = $Transaction.id
-            PAYMENT_TYPE_CODE = ''
-            PAYMENT_COLLECTION_EVENT = ''
-            CREDIT_CARD_NUMBER = ''
-            CREDIT_CARD_HOLDER_NAME = ''
-            CREDIT_CARD_CODE = ''
-            CREDIT_CARD_APPROVAL_CODE = ''
-            CREDIT_CARD_APPROVAL_DATE = ''
-            PAYMENT_AMOUNT = ''
-            CREATION_DATE = ''
-            LAST_UPDATE_DATE = ''
-            CREDIT_CARD_EXPIRATION_MONTH = ''
-            CREDIT_CARD_EXPIRATION_YEAR = ''
-            CREDIT_CARD_PAYMENT_STATUS = ''
-            PROCESS_FLAG = ''
-            SOURCE_NAME = ''
-            OPERATING_UNIT_NAME = ''
-            CREATED_BY_NAME = ''
-            LAST_UPDATED_BY_NAME = ''
+            PAYMENT_TYPE_CODE = $PaymentTypeCode
+            PAYMENT_COLLECTION_EVENT = $PaymentCollectionEvent
+            CREDIT_CARD_NUMBER = $CreditCardNumber
+            CREDIT_CARD_HOLDER_NAME = ""
+            CREDIT_CARD_CODE = 'UNKNOWN'
+            CREDIT_CARD_APPROVAL_CODE = $Transaction.authorization
+            CREDIT_CARD_APPROVAL_DATE = $CreditCardApprovalDate
+            PAYMENT_AMOUNT = $Transaction.amount
+            CREATION_DATE = "sysdate"
+            LAST_UPDATE_DATE = "sysdate"
+            CREDIT_CARD_EXPIRATION_MONTH = $Transaction.receipt.payment_method_details.card.exp_month
+            CREDIT_CARD_EXPIRATION_YEAR = $Transaction.receipt.payment_method_details.card.exp_year
+            CREDIT_CARD_PAYMENT_STATUS = ""
+            PROCESS_FLAG = "N"
+            SOURCE_NAME = 'SPF-OSP'
+            OPERATING_UNIT_NAME = "Tervis Operating Unit"
+            CREATED_BY_NAME = "SHOPIFY"
+            LAST_UPDATED_BY_NAME = "SHOPIFY"
         }
     }
+}
+
+function Get-TervisShopifyPaymentTypeCode {
+    param (
+        [Parameter(Mandatory,ValueFromPipeline)]$Transaction
+    )
+    process {
+        switch ($Transaction.gateway) {
+            "cash" { "CHECK"; break }
+            "shopify_payments" { "CREDIT_CARD"; break }
+            default { "UNKNOWN" }
+        }
+    }
+}
+
+function Get-TervisShopifyPaymentCollectionEvent {
+    param (
+        [Parameter(Mandatory,ValueFromPipeline)]$Transaction
+    )
+    process {
+        switch ($Transaction.kind) {
+            "sale" { "PREPAY"; break }
+            "authorization" { "INVOICE"; break }
+            default {""}
+        }
+    }
+}
+
+function New-TervisShopifyCCDummyNumber {
+    param (
+        [Parameter(Mandatory,ValueFromPipeline)]$Transaction
+    )
+    process {
+        if ($Transaction.payment_details.credit_card_number) {
+            return $Transaction.id.ToString().PadLeft(12,"0").Substring(0,12) + `
+                $Transaction.payment_details.credit_card_number.Substring(15,4)            
+        } else {
+            return ""
+        }
+    }
+}
+
+function ConvertTo-TervisShopifyOracleSqlUtcDateString {
+    param (
+        [Parameter(Mandatory,ValueFromPipeline)]$DateTime
+    )
+    $UtcDateTimeString = (Get-Date $DateTime).ToUniversalTime().GetDateTimeFormats("u")
+    $OracleSqlToDateFunction = "TO_DATE('$UtcDateTimeString', 'YYYY-MM-DD HH24:MI:SS`"Z`"')"
+    return $OracleSqlToDateFunction
 }
 
 function New-EBSOrderLineSubquery {
@@ -483,6 +535,66 @@ function New-EBSOrderLineHeaderSubquery {
             '$($ConvertedOrder.OPERATING_UNIT_NAME)',
             '$($ConvertedOrder.CREATED_BY_NAME)',
             '$($ConvertedOrder.LAST_UPDATED_BY_NAME)'
+        )
+"@
+        return $Query
+    }
+}
+
+function New-EBSOrderLinePaymentSubquery {
+    param (
+        [Parameter(Mandatory,ValueFromPipeline)]$ConvertedPayment
+    )
+
+    process {
+        $Query = @"
+        INTO xxoe_payments_iface_all
+        (
+            ORDER_SOURCE_ID,
+            ORIG_SYS_DOCUMENT_REF,
+            ORIG_SYS_PAYMENT_REF,
+            PAYMENT_TYPE_CODE,
+            PAYMENT_COLLECTION_EVENT,
+            CREDIT_CARD_NUMBER,
+            CREDIT_CARD_HOLDER_NAME,
+            CREDIT_CARD_CODE,
+            CREDIT_CARD_APPROVAL_CODE,
+            CREDIT_CARD_APPROVAL_DATE,
+            PAYMENT_AMOUNT,
+            CREATION_DATE,
+            LAST_UPDATE_DATE,
+            CREDIT_CARD_EXPIRATION_MONTH,
+            CREDIT_CARD_EXPIRATION_YEAR,
+            CREDIT_CARD_PAYMENT_STATUS,
+            PROCESS_FLAG,
+            SOURCE_NAME,
+            OPERATING_UNIT_NAME,
+            CREATED_BY_NAME,
+            LAST_UPDATED_BY_NAME
+        )
+        VALUES
+        (
+            $($ConvertedPayment.ORDER_SOURCE_ID),
+            '$($ConvertedPayment.ORIG_SYS_DOCUMENT_REF)',
+            '$($ConvertedPayment.ORIG_SYS_PAYMENT_REF)',
+            '$($ConvertedPayment.PAYMENT_TYPE_CODE)',
+            '$($ConvertedPayment.PAYMENT_COLLECTION_EVENT)',
+            '$($ConvertedPayment.CREDIT_CARD_NUMBER)',
+            '$($ConvertedPayment.CREDIT_CARD_HOLDER_NAME)',
+            '$($ConvertedPayment.CREDIT_CARD_CODE)',
+            '$($ConvertedPayment.CREDIT_CARD_APPROVAL_CODE)',
+            $($ConvertedPayment.CREDIT_CARD_APPROVAL_DATE),
+            $($ConvertedPayment.PAYMENT_AMOUNT),
+            $($ConvertedPayment.CREATION_DATE),
+            $($ConvertedPayment.LAST_UPDATE_DATE),
+            $($ConvertedPayment.CREDIT_CARD_EXPIRATION_MONTH),
+            $($ConvertedPayment.CREDIT_CARD_EXPIRATION_YEAR),
+            '$($ConvertedPayment.CREDIT_CARD_PAYMENT_STATUS)',
+            '$($ConvertedPayment.PROCESS_FLAG)',
+            '$($ConvertedPayment.SOURCE_NAME)',
+            '$($ConvertedPayment.OPERATING_UNIT_NAME)',
+            '$($ConvertedPayment.CREATED_BY_NAME)',
+            '$($ConvertedPayment.LAST_UPDATED_BY_NAME)'
         )
 "@
         return $Query
