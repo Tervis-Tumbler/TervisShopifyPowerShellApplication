@@ -213,6 +213,7 @@ function Convert-TervisShopifyOrderToEBSOrderLines {
         $Order.lineItems.edges.node | ForEach-Object {
             $OrderLineNumber++
             [PSCustomObject]@{
+                ORDER_SOURCE_ID = "1022" # For use during testing payments
                 ORIG_SYS_DOCUMENT_REF = $ORIG_SYS_DOCUMENT_REF
                 ORIG_SYS_LINE_REF = "$OrderLineNumber"
                 ORIG_SYS_SHIPMENT_REF = ""
@@ -276,6 +277,7 @@ function Convert-TervisShopifyOrderToEBSOrderLineHeaders {
         $Order.lineItems.edges.node | ForEach-Object {
             $OrderLineNumber++
             [PSCustomObject]@{
+                ORDER_SOURCE_ID = "1022" # For use during testing payments
                 ORIG_SYS_DOCUMENT_REF = $ORIG_SYS_DOCUMENT_REF
                 ORDERED_DATE = "TO_DATE('$($Order.createdAt)', 'YYYY-MM-DD`"T`"HH24:MI:SS`"Z`"')"
                 ORDER_TYPE = "Store Order"
@@ -335,7 +337,8 @@ function Convert-TervisShopifyPaymentsToEBSPayment {
 
 
         [PSCustomObject]@{
-            ORDER_SOURCE_ID = "1101"
+            # ORDER_SOURCE_ID = "1101"
+            ORDER_SOURCE_ID = "1022" # For use during testing payments
             ORIG_SYS_DOCUMENT_REF = $ORIG_SYS_DOCUMENT_REF
             ORIG_SYS_PAYMENT_REF = $Transaction.id
             PAYMENT_TYPE_CODE = $PaymentTypeCode
@@ -352,7 +355,8 @@ function Convert-TervisShopifyPaymentsToEBSPayment {
             CREDIT_CARD_EXPIRATION_YEAR = $Transaction.receipt.payment_method_details.card.exp_year
             CREDIT_CARD_PAYMENT_STATUS = ""
             PROCESS_FLAG = "N"
-            SOURCE_NAME = 'SPF-OSP'
+            # SOURCE_NAME = 'SPF-OSP'
+            SOURCE_NAME = 'RMS' # For use during testing payments
             OPERATING_UNIT_NAME = "Tervis Operating Unit"
             CREATED_BY_NAME = "SHOPIFY"
             LAST_UPDATED_BY_NAME = "SHOPIFY"
@@ -419,16 +423,54 @@ function New-EBSOrderLineSubquery {
         $Query = @"
             INTO xxoe_lines_iface_all
             (
-                ORIG_SYS_DOCUMENT_REF, ORIG_SYS_LINE_REF, ORIG_SYS_SHIPMENT_REF, LINE_TYPE, INVENTORY_ITEM, 
-                ORDERED_QUANTITY, ORDER_QUANTITY_UOM, SHIP_FROM_ORG, PRICE_LIST, UNIT_LIST_PRICE, UNIT_SELLING_PRICE, 
-                CALCULATE_PRICE_FLAG, RETURN_REASON_CODE, CUSTOMER_ITEM_ID_TYPE, ATTRIBUTE1, ATTRIBUTE7, ATTRIBUTE13, 
-                ATTRIBUTE14, CREATION_DATE, LAST_UPDATE_DATE, SUBINVENTORY, EARLIEST_ACCEPTABLE_DATE, LATEST_ACCEPTABLE_DATE, 
-                GIFT_MESSAGE, SIDE1_COLOR, SIDE2_COLOR, SIDE1_FONT, SIDE2_FONT, SIDE1_TEXT1, SIDE2_TEXT1, SIDE1_TEXT2, 
-                SIDE2_TEXT2, SIDE1_TEXT3, SIDE2_TEXT3, SIDE1_INITIALS, SIDE2_INITIALS, PROCESS_FLAG, SOURCE_NAME, 
-                OPERATING_UNIT_NAME, CREATED_BY_NAME, LAST_UPDATED_BY_NAME, ACCESSORY, TAX_VALUE
+                ORDER_SOURCE_ID,
+                ORIG_SYS_DOCUMENT_REF,
+                ORIG_SYS_LINE_REF,
+                ORIG_SYS_SHIPMENT_REF,
+                LINE_TYPE,
+                INVENTORY_ITEM,
+                ORDERED_QUANTITY,
+                ORDER_QUANTITY_UOM,
+                SHIP_FROM_ORG,
+                PRICE_LIST,
+                UNIT_LIST_PRICE,
+                UNIT_SELLING_PRICE,
+                CALCULATE_PRICE_FLAG,
+                RETURN_REASON_CODE,
+                CUSTOMER_ITEM_ID_TYPE,
+                ATTRIBUTE1,
+                ATTRIBUTE7,
+                ATTRIBUTE13,
+                ATTRIBUTE14,
+                CREATION_DATE,
+                LAST_UPDATE_DATE,
+                SUBINVENTORY,
+                EARLIEST_ACCEPTABLE_DATE,
+                LATEST_ACCEPTABLE_DATE,
+                GIFT_MESSAGE,
+                SIDE1_COLOR,
+                SIDE2_COLOR,
+                SIDE1_FONT,
+                SIDE2_FONT,
+                SIDE1_TEXT1,
+                SIDE2_TEXT1,
+                SIDE1_TEXT2,
+                SIDE2_TEXT2,
+                SIDE1_TEXT3,
+                SIDE2_TEXT3,
+                SIDE1_INITIALS,
+                SIDE2_INITIALS,
+                PROCESS_FLAG,
+                SOURCE_NAME,
+                OPERATING_UNIT_NAME,
+                CREATED_BY_NAME,
+                LAST_UPDATED_BY_NAME,
+                ACCESSORY,
+                TAX_VALUE
             )
             VALUES
             (
+                '$($ConvertedOrder.ORDER_SOURCE_ID)',
                 '$($ConvertedOrder.ORIG_SYS_DOCUMENT_REF)',
                 '$($ConvertedOrder.ORIG_SYS_LINE_REF)',
                 '$($ConvertedOrder.ORIG_SYS_SHIPMENT_REF)',
@@ -488,18 +530,46 @@ function New-EBSOrderLineHeaderSubquery {
         $Query = @"
         INTO xxoe_headers_iface_all
         (
-            ORIG_SYS_DOCUMENT_REF, ORDERED_DATE, ORDER_TYPE, PRICE_LIST, SALESREP, 
-            PAYMENT_TERM, SHIPMENT_PRIORITY_CODE, SHIPPING_METHOD_CODE, SHIPMENT_PRIORITY, 
-            SHIPPING_INSTRUCTIONS, CUSTOMER_PO_NUMBER, SHIP_FROM_ORG, SHIP_TO_ORG, 
-            INVOICE_TO_ORG, CUSTOMER_NUMBER, BOOKED_FLAG, ATTRIBUTE8, CREATION_DATE, 
-            LAST_UPDATE_DATE, ORIG_SYS_CUSTOMER_REF, ORIG_SHIP_ADDRESS_REF, 
-            ORIG_BILL_ADDRESS_REF, SHIP_TO_CONTACT_REF, BILL_TO_CONTACT_REF, 
-            GIFT_MESSAGE, CUSTOMER_REQUESTED_DATE, CARRIER_NAME, CARRIER_SERVICE_LEVEL, 
-            CARRIER_RESIDENTIAL_DELIVERY, ATTRIBUTE6, PROCESS_FLAG, SOURCE_NAME, 
-            OPERATING_UNIT_NAME, CREATED_BY_NAME, LAST_UPDATED_BY_NAME
+            ORDER_SOURCE_ID,
+            ORIG_SYS_DOCUMENT_REF,
+            ORDERED_DATE,
+            ORDER_TYPE,
+            PRICE_LIST,
+            SALESREP,
+            PAYMENT_TERM,
+            SHIPMENT_PRIORITY_CODE,
+            SHIPPING_METHOD_CODE,
+            SHIPMENT_PRIORITY,
+            SHIPPING_INSTRUCTIONS,
+            CUSTOMER_PO_NUMBER,
+            SHIP_FROM_ORG,
+            SHIP_TO_ORG,
+            INVOICE_TO_ORG,
+            CUSTOMER_NUMBER,
+            BOOKED_FLAG,
+            ATTRIBUTE8,
+            CREATION_DATE,
+            LAST_UPDATE_DATE,
+            ORIG_SYS_CUSTOMER_REF,
+            ORIG_SHIP_ADDRESS_REF,
+            ORIG_BILL_ADDRESS_REF,
+            SHIP_TO_CONTACT_REF,
+            BILL_TO_CONTACT_REF,
+            GIFT_MESSAGE,
+            CUSTOMER_REQUESTED_DATE,
+            CARRIER_NAME,
+            CARRIER_SERVICE_LEVEL,
+            CARRIER_RESIDENTIAL_DELIVERY,
+            ATTRIBUTE6,
+            PROCESS_FLAG,
+            SOURCE_NAME,
+            OPERATING_UNIT_NAME,
+            CREATED_BY_NAME,
+            LAST_UPDATED_BY_NAME
         )
         VALUES
         (
+            '$($ConvertedOrder.ORDER_SOURCE_ID)',
             '$($ConvertedOrder.ORIG_SYS_DOCUMENT_REF)',
             $($ConvertedOrder.ORDERED_DATE),
             '$($ConvertedOrder.ORDER_TYPE)',
