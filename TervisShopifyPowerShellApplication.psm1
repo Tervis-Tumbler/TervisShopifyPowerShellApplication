@@ -9,8 +9,8 @@ function Invoke-TervisShopifyInterfaceItemUpdate {
 
     $ShopNames = @{
         Delta = "ospreystoredev"
-        Epsilon = ""
-        Production = "tervisteststore01"
+        Epsilon = "tervisteststore01"
+        Production = "tervisstore"
     }
 
     $OtherParams = @{
@@ -165,7 +165,7 @@ function Set-ShopifyStagingTableUpdateFlag {
 
 function Invoke-TervisShopifyOrderLinesInterface {
     param (
-        [Parameter(Mandatory)]$Environment
+        [Parameter(Mandatory)][ValidateSet("Delta","Epsilon","Production")]$Environment
     )
 
     Write-Progress -Activity "Shopify Sales Batch Interface" -CurrentOperation "Setting environment variables"
@@ -174,7 +174,8 @@ function Invoke-TervisShopifyOrderLinesInterface {
 
     $ShopName = switch ($Environment) {
         "Delta" {"ospreystoredev"; break}
-        "Production" {"tervisteststore01"; break}
+        "Epsilon" {"tervisteststore01"; break}
+        "Production" {"tervisstore"; break}
         default {throw "Environment not recognized"}
     }
 
