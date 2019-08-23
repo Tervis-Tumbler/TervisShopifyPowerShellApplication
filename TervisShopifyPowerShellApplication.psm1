@@ -48,7 +48,7 @@ function Invoke-TervisShopifyInterfaceItemUpdate {
     )
     
     Write-Progress -Activity "Syncing products to Shopify" -CurrentOperation "Setting environment variables"
-    Set-TervisEBSEnvironment -Name $Environment
+    Set-TervisEBSEnvironment -Name $Environment -ErrorAction SilentlyContinue
     Set-TervisShopifyEnvironment -Environment $Environment
 
     $ShopNames = @{
