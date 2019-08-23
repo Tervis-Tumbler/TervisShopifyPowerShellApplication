@@ -1,6 +1,9 @@
 function Invoke-TervisShopifyPowerShellApplicationProvision {
-    Invoke-ApplicationProvision -ApplicationName ShopifyInterface -EnvironmentName Infrastructure
-    $Nodes = Get-TervisApplicationNode -ApplicationName ShopifyInterface -EnvironmentName Infrastructure
+    param (
+        [Parameter(Mandatory)][ValidateSet("Delta","Epsilon","Production")]$EnvironmentName
+    )
+    Invoke-ApplicationProvision -ApplicationName ShopifyInterface -EnvironmentName $EnvironmentName
+    $Nodes = Get-TervisApplicationNode -ApplicationName ShopifyInterface -EnvironmentName $EnvironmentName
     $Nodes | Install-TervisShopifyPowerShellApplication_ItemInterface
 }
 
