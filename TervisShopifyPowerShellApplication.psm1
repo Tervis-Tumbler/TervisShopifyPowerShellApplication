@@ -1,3 +1,47 @@
+function Invoke-TervisShopifyPowerShellApplicationProvision {
+    Invoke-ApplicationProvision -ApplicationName ShopifyInterface -EnvironmentName Infrastructure
+    $Nodes = Get-TervisApplicationNode -ApplicationName ShopifyInterface -EnvironmentName Infrastructure
+    $Nodes | Install-TervisShopifyPowerShellApplication_ItemInterface
+}
+
+function Install-TervisShopifyPowerShellApplication_ItemInterface {
+    param (
+        [Parameter(Mandatory,ValueFromPipelineByPropertyName)]$ComputerName,
+        [Parameter(Mandatory,ValueFromPipelineByPropertyName)]
+        [ValidateSet("Delta","Epsilon","Production")]$EnvironmentName
+    )
+    begin {
+        $ScheduledTasksCredential = Get-TervisPasswordstatePassword -Guid "eed2bd81-fd47-4342-bd59-b396da75c7ed" -AsCredential
+    }
+    process {
+        $PowerShellApplicationParameters = @{
+            ComputerName = $ComputerName
+            EnvironmentName = $EnvironmentName
+            ModuleName = "TervisShopifyPowerShellApplication"
+            TervisModuleDependencies = `
+                "WebServicesPowerShellProxyBuilder",
+                "TervisPowerShellJobs",
+                "PasswordstatePowershell",
+                "TervisPasswordstatePowershell",
+                "OracleE-BusinessSuitePowerShell",
+                "TervisOracleE-BusinessSuitePowerShell",
+                "InvokeSQL",
+                "TervisMicrosoft.PowerShell.Utility",
+                "TervisMicrosoft.PowerShell.Security",
+                "ShopifyPowerShell",
+                "TervisShopify",
+                "TervisShopifyPowerShellApplication"
+            NugetDependencies = "Oracle.ManagedDataAccess.Core"
+            ScheduledTaskName = "ShopifyItemInterface"
+            RepetitionIntervalName = "EveryDayEvery15Minutes"
+            CommandString = "Invoke-TervisShopifyInterfaceItemUpdate -Environment $EnvironmentName"
+            ScheduledTasksCredential = $ScheduledTasksCredential
+        }
+        
+        Install-PowerShellApplication @PowerShellApplicationParameters
+    }
+}
+
 function Invoke-TervisShopifyInterfaceItemUpdate {
     param (
         [Parameter(Mandatory)][ValidateSet("Delta","Epsilon","Production")]$Environment
