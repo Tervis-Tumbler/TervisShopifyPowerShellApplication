@@ -282,7 +282,7 @@ function Convert-TervisShopifyOrderToEBSOrderLines {
                 ATTRIBUTE14 = ""
                 CREATION_DATE = "sysdate"
                 LAST_UPDATE_DATE = "sysdate"
-                SUBINVENTORY = $LocationDefinition.SecondaryInventoryName
+                SUBINVENTORY = $LocationDefinition.Subinventory
                 EARLIEST_ACCEPTABLE_DATE = ""
                 LATEST_ACCEPTABLE_DATE = ""
                 GIFT_MESSAGE = ""
