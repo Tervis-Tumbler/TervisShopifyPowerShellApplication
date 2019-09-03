@@ -45,6 +45,19 @@ function Install-TervisShopifyPowerShellApplication_ItemInterface {
     }
 }
 
+function Get-TervisShopifyEnvironmentShopName {
+    param (
+        [Parameter(Mandatory)][ValidateSet("Delta","Epsilon","Production")]$Environment
+    )
+
+    switch ($Environment) {
+        "Delta" {"ospreystoredev"; break}
+        "Epsilon" {"tervisteststore01"; break}
+        "Production" {"tervisstore"; break}
+        default {throw "Environment not recognized"}
+    }
+}
+
 function Invoke-TervisShopifyInterfaceItemUpdate {
     param (
         [Parameter(Mandatory)][ValidateSet("Delta","Epsilon","Production")]$Environment
@@ -54,14 +67,8 @@ function Invoke-TervisShopifyInterfaceItemUpdate {
     Set-TervisEBSEnvironment -Name $Environment -ErrorAction SilentlyContinue
     Set-TervisShopifyEnvironment -Environment $Environment
 
-    $ShopNames = @{
-        Delta = "ospreystoredev"
-        Epsilon = "tervisteststore01"
-        Production = "tervisstore"
-    }
-
     $OtherParams = @{
-        ShopName = $ShopNames[$Environment]
+        ShopName = Get-TervisShopifyEnvironmentShopName -Environment $Environment
         Locations = Get-ShopifyRestLocations -ShopName $ShopNames[$Environment]
     }
 
@@ -210,7 +217,7 @@ function Set-ShopifyStagingTableUpdateFlag {
     Invoke-EBSSQL -SQLCommand $Query
 }
 
-function Invoke-TervisShopifyOrderLinesInterface {
+function Invoke-TervisShopifyInterfaceSalesImport {
     param (
         [Parameter(Mandatory)][ValidateSet("Delta","Epsilon","Production")]$Environment
     )
@@ -219,12 +226,7 @@ function Invoke-TervisShopifyOrderLinesInterface {
     Set-TervisEBSEnvironment -Name $Environment
     Set-TervisShopifyEnvironment -Environment $Environment
 
-    $ShopName = switch ($Environment) {
-        "Delta" {"ospreystoredev"; break}
-        "Epsilon" {"tervisteststore01"; break}
-        "Production" {"tervisstore"; break}
-        default {throw "Environment not recognized"}
-    }
+    $ShopName = Get-TervisShopifyEnvironmentShopName -Environment $Environment
 
     try {
         Write-Progress -Activity "Shopify Sales Batch Interface" -CurrentOperation "Getting orders"
