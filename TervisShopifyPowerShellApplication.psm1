@@ -732,3 +732,17 @@ function Invoke-EBSSubqueryInsert {
         Invoke-EBSSQL -SQLCommand $FinalQuery
     }
 }
+
+function Invoke-TervisShopifyInterfaceInventoryUpdate {
+    param (
+        [Parameter(Mandatory)][ValidateSet("Delta","Epsilon","Production")]$Environment
+    )
+    
+    Write-Progress -Activity "Shopify interface - inventory update" -CurrentOperation "Setting environment variables"
+    Set-TervisEBSEnvironment -Name $Environment
+    Set-TervisShopifyEnvironment -Environment $Environment
+
+    $ShopName = Get-TervisShopifyEnvironmentShopName -Environment $Environment
+
+
+}
