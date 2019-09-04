@@ -233,7 +233,7 @@ function Invoke-TervisShopifyInterfaceSalesImport {
         $ShopifyOrders = Get-TervisShopifyOrdersNotTaggedWithEBS -ShopName $ShopName
         Write-Progress -Activity "Shopify Sales Batch Interface" -CurrentOperation "Converting orders to EBS format"
         $ConvertedOrderLines = $ShopifyOrders | Convert-TervisShopifyOrderToEBSOrderLines
-        $ConvertedOrderHeaders = $ShopifyOrders | Convert-TervisShopifyOrderToEBSOrderLineHeaders
+        $ConvertedOrderHeaders = $ShopifyOrders | Convert-TervisShopifyOrderToEBSOrderLineHeader
         $Subqueries = $ConvertedOrderLines | New-EBSOrderLineSubquery
         $Subqueries += $ConvertedOrderHeaders | New-EBSOrderLineHeaderSubquery
         Write-Progress -Activity "Shopify Sales Batch Interface" -CurrentOperation "Sending orders to EBS"
@@ -312,7 +312,7 @@ function Convert-TervisShopifyOrderToEBSOrderLines {
     }
 }
 
-function Convert-TervisShopifyOrderToEBSOrderLineHeaders {
+function Convert-TervisShopifyOrderToEBSOrderLineHeader {
     param (
         [Parameter(Mandatory,ValueFromPipeline)]$Order
     )
@@ -322,48 +322,44 @@ function Convert-TervisShopifyOrderToEBSOrderLineHeaders {
         $StoreNumber = $LocationDefinition.RMSStoreNumber
         $StoreCustomerNumber = $LocationDefinition.CustomerNumber
         $ORIG_SYS_DOCUMENT_REF = "$StoreNumber-$OrderId"
-        $OrderLineNumber = 0
 
-        $Order.lineItems.edges.node | ForEach-Object {
-            $OrderLineNumber++
-            [PSCustomObject]@{
-                ORDER_SOURCE_ID = "1022" # For use during testing payments
-                ORIG_SYS_DOCUMENT_REF = $ORIG_SYS_DOCUMENT_REF
-                ORDERED_DATE = "TO_DATE('$($Order.createdAt)', 'YYYY-MM-DD`"T`"HH24:MI:SS`"Z`"')"
-                ORDER_TYPE = "Store Order"
-                PRICE_LIST = ""
-                SALESREP = ""
-                PAYMENT_TERM = ""
-                SHIPMENT_PRIORITY_CODE = ""
-                SHIPPING_METHOD_CODE = ""
-                SHIPMENT_PRIORITY = ""
-                SHIPPING_INSTRUCTIONS = ""
-                CUSTOMER_PO_NUMBER = ""
-                SHIP_FROM_ORG = "ORG"
-                SHIP_TO_ORG = ""
-                INVOICE_TO_ORG = ""
-                CUSTOMER_NUMBER = $StoreCustomerNumber
-                BOOKED_FLAG = "Y"
-                ATTRIBUTE8 = ""
-                CREATION_DATE = "sysdate"
-                LAST_UPDATE_DATE = "sysdate"
-                ORIG_SYS_CUSTOMER_REF = ""
-                ORIG_SHIP_ADDRESS_REF = ""
-                ORIG_BILL_ADDRESS_REF = ""
-                SHIP_TO_CONTACT_REF = ""
-                BILL_TO_CONTACT_REF = ""
-                GIFT_MESSAGE = ""
-                CUSTOMER_REQUESTED_DATE = ""
-                CARRIER_NAME = ""
-                CARRIER_SERVICE_LEVEL = ""
-                CARRIER_RESIDENTIAL_DELIVERY = ""
-                ATTRIBUTE6 = ""
-                PROCESS_FLAG = "N"
-                SOURCE_NAME = "RMS"
-                OPERATING_UNIT_NAME = "Tervis Operating Unit"
-                CREATED_BY_NAME = "SHOPIFY"
-                LAST_UPDATED_BY_NAME = "SHOPIFY"
-            }
+        [PSCustomObject]@{
+            ORDER_SOURCE_ID = "1022" # For use during testing payments
+            ORIG_SYS_DOCUMENT_REF = $ORIG_SYS_DOCUMENT_REF
+            ORDERED_DATE = "TO_DATE('$($Order.createdAt)', 'YYYY-MM-DD`"T`"HH24:MI:SS`"Z`"')"
+            ORDER_TYPE = "Store Order"
+            PRICE_LIST = ""
+            SALESREP = ""
+            PAYMENT_TERM = ""
+            SHIPMENT_PRIORITY_CODE = ""
+            SHIPPING_METHOD_CODE = ""
+            SHIPMENT_PRIORITY = ""
+            SHIPPING_INSTRUCTIONS = ""
+            CUSTOMER_PO_NUMBER = ""
+            SHIP_FROM_ORG = "ORG"
+            SHIP_TO_ORG = ""
+            INVOICE_TO_ORG = ""
+            CUSTOMER_NUMBER = $StoreCustomerNumber
+            BOOKED_FLAG = "Y"
+            ATTRIBUTE8 = ""
+            CREATION_DATE = "sysdate"
+            LAST_UPDATE_DATE = "sysdate"
+            ORIG_SYS_CUSTOMER_REF = ""
+            ORIG_SHIP_ADDRESS_REF = ""
+            ORIG_BILL_ADDRESS_REF = ""
+            SHIP_TO_CONTACT_REF = ""
+            BILL_TO_CONTACT_REF = ""
+            GIFT_MESSAGE = ""
+            CUSTOMER_REQUESTED_DATE = ""
+            CARRIER_NAME = ""
+            CARRIER_SERVICE_LEVEL = ""
+            CARRIER_RESIDENTIAL_DELIVERY = ""
+            ATTRIBUTE6 = ""
+            PROCESS_FLAG = "N"
+            SOURCE_NAME = "RMS"
+            OPERATING_UNIT_NAME = "Tervis Operating Unit"
+            CREATED_BY_NAME = "SHOPIFY"
+            LAST_UPDATED_BY_NAME = "SHOPIFY"
         }
     }
 }
