@@ -84,11 +84,11 @@ function Invoke-TervisShopifyInterfaceItemUpdate {
     # }
     # $MaxConcurrentRequests = 3
 
-    $NewRecordCount = Get-ShopifyStagingTableCount
+    $NewRecordCount = Get-TervisShopifyItemStagingTableCount
     if ($NewRecordCount -gt 0) {
         $i = 0
         Write-Progress -Activity "Syncing products to Shopify" -CurrentOperation "Getting product records"
-        $NewRecords = Get-ShopifyStagingTableUpdates
+        $NewRecords = Get-TervisShopifyItemStagingTableUpdates
         # Start-ParallelWork -ScriptBlock $ProductUpdateScriptBlock -Parameters $NewRecords -OptionalParameters $OtherParams -MaxConcurrentJobs $MaxConcurrentRequests
         $NewRecords | ForEach-Object {
             $i++; Write-Progress -Activity "Syncing products to Shopify" -Status "$i of $NewRecordCount" -PercentComplete ($i * 100 / $NewRecordCount) -CurrentOperation "Processing EBS item #$($_.ITEM_NUMBER)" -SecondsRemaining (($NewRecordCount - $i) * 4)
@@ -148,7 +148,7 @@ function Invoke-TervisShopifyAddOrUpdateProduct {
             }
 
             # Write back to EBS staging table
-            Set-ShopifyStagingTableUpdateFlag -EbsItemNumber $NewOrUpdatedProduct.variants.edges.node.inventoryItem.sku
+            Set-TervisShopifyItemStagingTableUpdateFlag -EbsItemNumber $NewOrUpdatedProduct.variants.edges.node.inventoryItem.sku
         } catch {
             # Write-Warning "$($_.ITEM_NUMBER) could not be created on Shopify"
             Write-Error $_
@@ -167,7 +167,7 @@ function Invoke-TervisShopifyRemoveProduct {
             if ($ShopifyProduct) {
                 Remove-ShopifyProduct -GlobalId $ShopifyProduct.id -ShopName $ShopName | Out-Null
             }
-            Set-ShopifyStagingTableUpdateFlag -EbsItemNumber $ProductRecord.ITEM_NUMBER
+            Set-TervisShopifyItemStagingTableUpdateFlag -EbsItemNumber $ProductRecord.ITEM_NUMBER
         } catch {
             Write-Error $_
         }
@@ -175,7 +175,7 @@ function Invoke-TervisShopifyRemoveProduct {
     }
 }
 
-function Get-ShopifyStagingTableCount {
+function Get-TervisShopifyItemStagingTableCount {
     $Query = @"
         SELECT count(*) 
         FROM xxtrvs.xxtrvs_store_item_price_intf
@@ -185,7 +185,7 @@ function Get-ShopifyStagingTableCount {
     Invoke-EBSSQL -SQLCommand $Query | Select-Object -ExpandProperty "COUNT(*)"
 }
 
-function Get-ShopifyStagingTableUpdates {
+function Get-TervisShopifyItemStagingTableUpdates {
     $Query = @"
         SELECT  item_id
                 ,item_number
@@ -203,9 +203,7 @@ function Get-ShopifyStagingTableUpdates {
     Invoke-EBSSQL -SQLCommand $Query 
 }
 
-function Test-ShopifyItemUpdate {} # Return boolean
-
-function Set-ShopifyStagingTableUpdateFlag {
+function Set-TervisShopifyItemStagingTableUpdateFlag {
     param (
         [Parameter(Mandatory)]$EbsItemNumber
     )
@@ -746,3 +744,7 @@ function Invoke-TervisShopifyInterfaceInventoryUpdate {
 
 
 }
+
+function Get-TervisShopifyInventoryStagingTableCount {}
+
+function Get-TervisShopifyInventoryStagingTableUpdates {}
