@@ -45,6 +45,47 @@ function Install-TervisShopifyPowerShellApplication_ItemInterface {
     }
 }
 
+function Install-TervisShopifyPowerShellApplication_InventoryInterface {
+    param (
+        [Parameter(Mandatory,ValueFromPipelineByPropertyName)]$ComputerName,
+        [Parameter(Mandatory,ValueFromPipelineByPropertyName)]
+        [ValidateSet("Delta","Epsilon","Production")]$EnvironmentName
+    )
+    begin {
+        $ScheduledTasksCredential = Get-TervisPasswordstatePassword -Guid "" -AsCredential
+    }
+    process {
+        $PowerShellApplicationParameters = @{
+            ComputerName = $ComputerName
+            EnvironmentName = $EnvironmentName
+            ModuleName = "TervisShopifyPowerShellApplication"
+            TervisModuleDependencies = `
+                "WebServicesPowerShellProxyBuilder",
+                "TervisPowerShellJobs",
+                "PasswordstatePowershell",
+                "TervisPasswordstatePowershell",
+                "OracleE-BusinessSuitePowerShell",
+                "TervisOracleE-BusinessSuitePowerShell",
+                "InvokeSQL",
+                "TervisMicrosoft.PowerShell.Utility",
+                "TervisMicrosoft.PowerShell.Security",
+                "ShopifyPowerShell",
+                "TervisShopify",
+                "TervisShopifyPowerShellApplication"
+            NugetDependencies = "Oracle.ManagedDataAccess.Core"
+            ScheduledTaskName = "ShopifyInventoryInterface"
+            RepetitionIntervalName = "EveryDayAt3am"
+            CommandString = "Invoke-TervisShopifyInterfaceInventoryUpdate -Environment $EnvironmentName"
+            ScheduledTasksCredential = $ScheduledTasksCredential
+        }
+        
+        Install-PowerShellApplication @PowerShellApplicationParameters
+        $PowerShellApplicationParameters.CommandString = ""
+        Install-PowerShellApplicationFiles @PowerShellApplicationParameters
+
+    }
+}
+
 function Get-TervisShopifyEnvironmentShopName {
     param (
         [Parameter(Mandatory)][ValidateSet("Delta","Epsilon","Production")]$Environment
@@ -742,9 +783,32 @@ function Invoke-TervisShopifyInterfaceInventoryUpdate {
 
     $ShopName = Get-TervisShopifyEnvironmentShopName -Environment $Environment
 
+    $NewRecordCount = Get-TervisShopifyInventoryStagingTableCount
+    if ($NewRecordCount -gt 0) {
+
+    }
 
 }
 
-function Get-TervisShopifyInventoryStagingTableCount {}
+function Get-TervisShopifyInventoryStagingTableCount {
+    $Query = @"
+        SELECT count(*) 
+        FROM xxtrvs.xxinv_store_ohq
+        WHERE 1 = 1
+        AND interfaced_flag = 'N'
+"@
+    Invoke-EBSSQL -SQLCommand $Query | Select-Object -ExpandProperty "COUNT(*)"
+}
 
-function Get-TervisShopifyInventoryStagingTableUpdates {}
+function Get-TervisShopifyInventoryStagingTableUpdates {
+    $Query = @"
+        SELECT  item_number
+                ,subinventory_code
+                ,on_hand_qty               
+        FROM xxtrvs.xxinv_store_ohq
+        WHERE 1 = 1
+        AND interfaced_flag = 'N'
+        ORDER BY 1
+"@
+    Invoke-EBSSQL -SQLCommand $Query 
+}
