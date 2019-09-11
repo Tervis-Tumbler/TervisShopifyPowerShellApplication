@@ -70,7 +70,6 @@ function Install-TervisShopifyPowerShellApplication_InventoryInterface {
                 "InvokeSQL",
                 "TervisMicrosoft.PowerShell.Utility",
                 "TervisMicrosoft.PowerShell.Security",
-                "TervisPowerShellJobs",
                 "ShopifyPowerShell",
                 "TervisShopify",
                 "TervisShopifyPowerShellApplication"
@@ -82,9 +81,12 @@ function Install-TervisShopifyPowerShellApplication_InventoryInterface {
         }
         
         Install-PowerShellApplication @PowerShellApplicationParameters
+        
         $PowerShellApplicationParameters.CommandString = ""
         $PowerShellApplicationParameters.ScriptFileName = "ParallelInitScript.ps1"
-        Install-PowerShellApplicationFiles @PowerShellApplicationParameters
+        $PowerShellApplicationParameters.Remove("RepetitionIntervalName")
+        $PowerShellApplicationParameters.Remove("ScheduledTasksCredential")
+        Install-PowerShellApplicationFiles @PowerShellApplicationParameters -ScriptOnly
 
     }
 }
@@ -798,7 +800,7 @@ function Invoke-TervisShopifyInterfaceInventoryUpdate {
             param (
                 $Parameter
             )
-            $Parameter #
+            $Parameter
         } -Parameters $Locations -InitializationScript {
             . $PSScriptRoot\ParallelInitScript.ps1
         }
