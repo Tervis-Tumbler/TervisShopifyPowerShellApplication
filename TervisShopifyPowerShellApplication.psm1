@@ -5,6 +5,7 @@ function Invoke-TervisShopifyPowerShellApplicationProvision {
     Invoke-ApplicationProvision -ApplicationName ShopifyInterface -EnvironmentName $EnvironmentName
     $Nodes = Get-TervisApplicationNode -ApplicationName ShopifyInterface -EnvironmentName $EnvironmentName
     $Nodes | Install-TervisShopifyPowerShellApplication_ItemInterface
+    $Nodes | Install-TervisShopifyPowerShellApplication_InventoryInterface
 }
 
 function Install-TervisShopifyPowerShellApplication_ItemInterface {
@@ -52,7 +53,7 @@ function Install-TervisShopifyPowerShellApplication_InventoryInterface {
         [ValidateSet("Delta","Epsilon","Production")]$EnvironmentName
     )
     begin {
-        $ScheduledTasksCredential = Get-TervisPasswordstatePassword -Guid "" -AsCredential
+        $ScheduledTasksCredential = Get-TervisPasswordstatePassword -Guid "eed2bd81-fd47-4342-bd59-b396da75c7ed" -AsCredential
     }
     process {
         $PowerShellApplicationParameters = @{
@@ -69,6 +70,7 @@ function Install-TervisShopifyPowerShellApplication_InventoryInterface {
                 "InvokeSQL",
                 "TervisMicrosoft.PowerShell.Utility",
                 "TervisMicrosoft.PowerShell.Security",
+                "TervisPowerShellJobs",
                 "ShopifyPowerShell",
                 "TervisShopify",
                 "TervisShopifyPowerShellApplication"
@@ -81,6 +83,7 @@ function Install-TervisShopifyPowerShellApplication_InventoryInterface {
         
         Install-PowerShellApplication @PowerShellApplicationParameters
         $PowerShellApplicationParameters.CommandString = ""
+        $PowerShellApplicationParameters.ScriptFileName = "ParallelInitScript.ps1"
         Install-PowerShellApplicationFiles @PowerShellApplicationParameters
 
     }
@@ -785,6 +788,21 @@ function Invoke-TervisShopifyInterfaceInventoryUpdate {
 
     $NewRecordCount = Get-TervisShopifyInventoryStagingTableCount
     if ($NewRecordCount -gt 0) {
+        # Get active locations with relevant information, like subinventory code
+        $Locations = Get-TervisShopifyActiveLocations -ShopName $ShopName
+        #foreach location
+            # Get inventory for specific location
+            # Create location + inventory object
+        # Start parallel jobs with objects + initialization script + creds
+        Start-ParallelWork -ScriptBlock {
+            param (
+                $Parameter
+            )
+            $Parameter #
+        } -Parameters $Locations -InitializationScript {
+            . $PSScriptRoot\ParallelInitScript.ps1
+        }
+        
 
     }
 
@@ -801,6 +819,10 @@ function Get-TervisShopifyInventoryStagingTableCount {
 }
 
 function Get-TervisShopifyInventoryStagingTableUpdates {
+    param (
+        $SubinventoryCode
+    )
+
     $Query = @"
         SELECT  item_number
                 ,subinventory_code
@@ -808,7 +830,7 @@ function Get-TervisShopifyInventoryStagingTableUpdates {
         FROM xxtrvs.xxinv_store_ohq
         WHERE 1 = 1
         AND interfaced_flag = 'N'
-        ORDER BY 1
+        $(if ($SubinventoryCode) {"AND subinventory_code = '$SubinventoryCode'"})
 "@
     Invoke-EBSSQL -SQLCommand $Query 
 }
