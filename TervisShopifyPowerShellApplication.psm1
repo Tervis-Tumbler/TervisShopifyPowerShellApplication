@@ -76,13 +76,16 @@ function Install-TervisShopifyPowerShellApplication_InventoryInterface {
             NugetDependencies = "Oracle.ManagedDataAccess.Core"
             ScheduledTaskName = "ShopifyInventoryInterface"
             RepetitionIntervalName = "EveryDayAt3am"
-            CommandString = "Invoke-TervisShopifyInterfaceInventoryUpdate -Environment $EnvironmentName"
+            CommandString = "Invoke-TervisShopifyInterfaceInventoryUpdate -Environment $EnvironmentName -ScriptRoot $PSScriptRoot"
             ScheduledTasksCredential = $ScheduledTasksCredential
         }
         
         Install-PowerShellApplication @PowerShellApplicationParameters
         
-        $PowerShellApplicationParameters.CommandString = ""
+        $PowerShellApplicationParameters.CommandString = @"
+Set-TervisEBSEnvironment -Name $Environment -ErrorAction SilentlyContinue
+Set-TervisShopifyEnvironment -Environment $Environment
+"@
         $PowerShellApplicationParameters.ScriptFileName = "ParallelInitScript.ps1"
         $PowerShellApplicationParameters.Remove("RepetitionIntervalName")
         $PowerShellApplicationParameters.Remove("ScheduledTasksCredential")
@@ -779,7 +782,8 @@ function Invoke-EBSSubqueryInsert {
 
 function Invoke-TervisShopifyInterfaceInventoryUpdate {
     param (
-        [Parameter(Mandatory)][ValidateSet("Delta","Epsilon","Production")]$Environment
+        [Parameter(Mandatory)][ValidateSet("Delta","Epsilon","Production")]$Environment,
+        $ScriptRoot
     )
     
     Write-Progress -Activity "Shopify interface - inventory update" -CurrentOperation "Setting environment variables"
@@ -796,16 +800,41 @@ function Invoke-TervisShopifyInterfaceInventoryUpdate {
             # Get inventory for specific location
             # Create location + inventory object
         # Start parallel jobs with objects + initialization script + creds
+        $InitializationExpression = "$ScriptRoot\ParallelInitScript.ps1"
         Start-ParallelWork -ScriptBlock {
             param (
-                $Parameter
+                $Parameter,
+                $OptionalParameters
             )
-            $Parameter
-        } -Parameters $Locations -InitializationScript {
-            . $PSScriptRoot\ParallelInitScript.ps1
-        }
-        
+            & $OptionalParameters
+            # Get-ShopifyLocation -ShopName ospreystoredev -LocationName $Parameter.name
+            # Get-TervisShopifyInventoryStagingTableUpdates -SubinventoryCode FL1 # 25 seconds for 100 records
+            # $InventoryUpdates
+            $InventoryUpdates = Get-TervisShopifyInventoryStagingTableUpdates -SubinventoryCode $Parameter.Subinventory
+            #Get current inventory - Get-ShopifyInventoryAtLocation
+            # Measure-Command {
+                $InventoryUpdates | foreach {
+                    $InventoryItem = Get-ShopifyInventoryLevelAtLocation `
+                        -ShopName $shopname `
+                        -SKU $_.ITEM_NUMBER `
+                        -LocationId $ShopifyLocation.id.split("/")[-1]
+                    $Difference = if ($InventoryItem) {
+                        $_.ON_HAND_QTY - $InventoryItem.inventoryLevel.available
+                    } else {
+                        # Write-Error "InventoryInterface: Error getting Shopify inventory level. SKU: $($_.ITEM_NUMBER), Subinventory: $($_.SUBINVENTORY_CODE)"
+                        "E"
+                    }
+                    $_ | Add-Member -MemberType NoteProperty -Name Difference -Value $Difference -Force
+                    $_ | Add-Member -MemberType NoteProperty -Name ShopifyGID -Value $InventoryItem.id -Force
+                }
+            # } # 30 seconds for 100 records
 
+            # Need to filter on difference 
+            [array]$InventoryAlreadySynced = $InventoryUpdates | Where-Object Difference -EQ 0
+            [array]$InventoryToBeAdjusted = $InventoryUpdates | Where-Object {$_.Difference -ne 0 -and $_.Difference -ne "E"}
+            [array]$InventoryThatErroredOut = $InventoryUpdates | Where-Object Difference -EQ "E"
+
+        } -Parameters $Locations -OptionalParameters $InitializationExpression
     }
 
 }
@@ -835,4 +864,78 @@ function Get-TervisShopifyInventoryStagingTableUpdates {
         $(if ($SubinventoryCode) {"AND subinventory_code = '$SubinventoryCode'"})
 "@
     Invoke-EBSSQL -SQLCommand $Query 
+}
+
+function New-TervisShopifyInventoryBulkAdjustQueryObject {
+    param (
+        [Parameter(Mandatory)][array]$InventoryArray,
+        [Parameter(Mandatory)][string]$LocationGID,
+        $QueryLimit = 20
+    )
+    
+    $GraphQLHeader = @"
+mutation {
+    inventoryBulkAdjustQuantityAtLocation (
+        inventoryItemAdjustments:
+            [
+"@
+    
+    $GraphQLFooter = {
+        param ($LocationGID)
+        $EncodedGID = ConvertTo-Base64 -String $LocationGID
+    @"
+            ],
+        locationId: "$EncodedGID"
+    ) {
+        userErrors {
+            field
+            message
+        }
+    }
+}
+"@
+    } 
+    
+    $InventoryBulkAdjustEntry = {
+        param (
+            $InventoryItemGID,
+            $Delta
+        )
+        $EncodedGID = ConvertTo-Base64 -String $InventoryItemGID
+    @"
+                {
+                    inventoryItemId: "$EncodedGID"
+                    availableDelta: $Delta
+                },
+"@
+    }
+    
+    $BuiltQueries = @()
+    
+    for ($i = 0; $i -lt $InventoryArray.Count; $i += $QueryLimit) {
+        $Query = $GraphQLHeader
+        $InventorySubset = $InventoryArray[$i..($i + $QueryLimit)]
+        $Query += $InventorySubset | ForEach-Object {
+            $InventoryBulkAdjustEntry.Invoke($_.ShopifyGID,$_.Difference)
+        }
+        $Query += $GraphQLFooter.Invoke($Locations[0].id)
+        $BuiltQueries += [PSCustomObject]@{
+            Query = $Query
+            EBSItemNumbers = [array]$InventorySubset.ITEM_NUMBER
+            SubinventoryCode = $InventorySubset[0].SUBINVENTORY_CODE
+        }
+    }
+
+    return $BuiltQueries
+}
+
+function Sync-TervisShopifyInventoryFromQueryObject {
+    param (
+        [Parameter(Mandatory,ValueFromPipelineByPropertyName)]$String,
+        [Parameter(Mandatory,ValueFromPipelineByPropertyName)][array]$EBSItemNumbers,
+        [Parameter(Mandatory,ValueFromPipelineByPropertyName)]$SubinventoryCode
+    )
+    process {
+        
+    }
 }
