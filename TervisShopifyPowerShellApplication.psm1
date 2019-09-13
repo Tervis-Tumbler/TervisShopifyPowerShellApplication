@@ -840,11 +840,15 @@ function Invoke-TervisShopifyInterfaceInventoryUpdate {
 }
 
 function Get-TervisShopifyInventoryStagingTableCount {
+    param (
+        $SubinventoryCode
+    )    
     $Query = @"
         SELECT count(*) 
         FROM xxtrvs.xxinv_store_ohq
         WHERE 1 = 1
         AND interfaced_flag = 'N'
+        $(if ($SubinventoryCode) {"AND subinventory_code = '$SubinventoryCode'"})
 "@
     Invoke-EBSSQL -SQLCommand $Query | Select-Object -ExpandProperty "COUNT(*)"
 }
