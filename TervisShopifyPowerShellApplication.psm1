@@ -946,7 +946,7 @@ mutation {
     for ($i = 0; $i -lt $InventoryArray.Count; $i += $QueryLimit) {
         # Write-Warning "Iteration: $i"
         $Query = $GraphQLHeader
-        $InventorySubset = $InventoryArray[$i..($i + $QueryLimit)]
+        $InventorySubset = $InventoryArray[$i..($i + $QueryLimit - 1)]
         # Write-Warning "InventorySubset - Count: $($InventorySubset.Count)"
         $Query += $InventorySubset | ForEach-Object {
             $InventoryBulkAdjustEntry.Invoke($_.ShopifyGID,$_.Difference)
