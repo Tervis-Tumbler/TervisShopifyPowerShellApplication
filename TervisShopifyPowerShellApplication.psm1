@@ -116,10 +116,8 @@ function Invoke-TervisShopifyInterfaceItemUpdate {
     Set-TervisEBSEnvironment -Name $Environment -ErrorAction SilentlyContinue
     Set-TervisShopifyEnvironment -Environment $Environment
 
-    $OtherParams = @{
-        ShopName = Get-TervisShopifyEnvironmentShopName -Environment $Environment
-        Locations = Get-ShopifyRestLocations -ShopName $ShopNames[$Environment]
-    }
+    ShopName = Get-TervisShopifyEnvironmentShopName -Environment $Environment
+    Locations = Get-ShopifyLocation -ShopName $ShopName -LocationName *
 
     # $ProductUpdateScriptBlock = {
     #     param($Parameter,$OptionalParameters)
@@ -142,9 +140,9 @@ function Invoke-TervisShopifyInterfaceItemUpdate {
         $NewRecords | ForEach-Object {
             $i++; Write-Progress -Activity "Syncing products to Shopify" -Status "$i of $NewRecordCount" -PercentComplete ($i * 100 / $NewRecordCount) -CurrentOperation "Processing EBS item #$($_.ITEM_NUMBER)" -SecondsRemaining (($NewRecordCount - $i) * 4)
             if ($_.ITEM_STATUS -in "Active","DTCDeplete") {
-                $_ | Invoke-TervisShopifyAddOrUpdateProduct -ShopName $OtherParams.ShopName -Locations $OtherParams.Locations
+                $_ | Invoke-TervisShopifyAddOrUpdateProduct -ShopName $ShopName -Locations $Locations
             } else {
-                $_ | Invoke-TervisShopifyRemoveProduct -ShopName $OtherParams.ShopName
+                $_ | Invoke-TervisShopifyRemoveProduct -ShopName $ShopName
             }
         }
     }
