@@ -116,8 +116,8 @@ function Invoke-TervisShopifyInterfaceItemUpdate {
     Set-TervisEBSEnvironment -Name $Environment -ErrorAction SilentlyContinue
     Set-TervisShopifyEnvironment -Environment $Environment
 
-    ShopName = Get-TervisShopifyEnvironmentShopName -Environment $Environment
-    Locations = Get-ShopifyLocation -ShopName $ShopName -LocationName *
+    $ShopName = Get-TervisShopifyEnvironmentShopName -Environment $Environment
+    $Locations = Get-ShopifyLocation -ShopName $ShopName -LocationName *
 
     # $ProductUpdateScriptBlock = {
     #     param($Parameter,$OptionalParameters)
