@@ -797,7 +797,7 @@ function Invoke-TervisShopifyInterfaceInventoryUpdate {
     if ($NewRecordCount -gt 0) {
         # Get active locations with relevant information, like subinventory code
         Write-Progress -Activity "Shopify interface - inventory update" -CurrentOperation "Setting Shopify locations"
-        $Locations = Get-TervisShopifyActiveLocations -ShopName $ShopName #| ? SUBINVENTORY -EQ "FL0" # | select -first 2
+        $Locations = Get-TervisShopifyActiveLocations -ShopName $ShopName  #| select -first 2 #| ? SUBINVENTORY -EQ "FL0"
         #foreach location
             # Get inventory for specific location
             # Create location + inventory object
@@ -817,7 +817,7 @@ function Invoke-TervisShopifyInterfaceInventoryUpdate {
             Write-Warning "$($Parameter.Subinventory): Getting inventory updates"
             if ((Get-TervisShopifyInventoryStagingTableCount -SubinventoryCode $Parameter.Subinventory) -gt 0) {
                 $TimePerStore = Measure-Command { # to measure process per store
-                $InventoryUpdates = Get-TervisShopifyInventoryStagingTableUpdates -SubinventoryCode $Parameter.Subinventory | select -first 100
+                $InventoryUpdates = Get-TervisShopifyInventoryStagingTableUpdates -SubinventoryCode $Parameter.Subinventory #| select -first 1000
                 Write-Warning "$($Parameter.Subinventory): Testing InventoryUpdates - Count: $($InventoryUpdates.Count)"
                 #Get current inventory - Get-ShopifyInventoryAtLocation
                 # Measure-Command {
@@ -842,17 +842,25 @@ function Invoke-TervisShopifyInterfaceInventoryUpdate {
     
                 # Need to filter on difference 
                 Write-Warning "$($Parameter.Subinventory): Creating arrays"
-                # [array]$InventoryAlreadySynced = $InventoryUpdates | Where-Object Difference -EQ 0 # Maybe log? Can probably be ignored
+                [array]$InventoryAlreadySynced = $InventoryUpdates | Where-Object Difference -EQ 0 # Maybe log? Can probably be ignored
                 [array]$InventoryToBeAdjusted = $InventoryUpdates | Where-Object {$_.Difference -ne 0 -and $_.Difference -ne "E"}
                 [array]$InventoryThatErroredOut = $InventoryUpdates | Where-Object Difference -EQ "E" # Need function to handle errored Inventory
                 
-                Write-Warning "$($Parameter.Subinventory): Testing inventory to be adjusted - Count: $($InventoryToBeAdjusted.Count)"
+                Write-Warning "$($Parameter.Subinventory): Inventory to be adjusted: $($InventoryToBeAdjusted.Count)"
+                Write-Warning "$($Parameter.Subinventory): Inventory that had no matching Shopify item: $($InventoryThatErroredOut.Count)"
+                Write-Warning "$($Parameter.Subinventory): Inventory already in sync: $($InventoryAlreadySynced.Count)"
                 if ($InventoryToBeAdjusted) {
                     Write-Warning "$($Parameter.Subinventory): Creating query objects"
                     [array]$QueryObjects = New-TervisShopifyInventoryBulkAdjustQueryObject -InventoryArray $InventoryToBeAdjusted -LocationGID $Parameter.id
                     
                     Write-Warning "$($Parameter.Subinventory): Query Objects created: $($QueryObjects.count)"
-                    $QueryObjects | Sync-TervisShopifyInventoryFromQueryObject
+                    $QueryObjects | Sync-TervisShopifyInventoryFromQueryObject -ShopName $ShopName
+                }
+                if ($InventoryAlreadySynced) {
+                    Set-TervisShopifyInventoryStagingTableUpdateFlagOnSyncedInventory -InventoryArray $InventoryAlreadySynced -SubinventoryCode $Parameter.Subinventory
+                }
+                if ($InventoryThatErroredOut) {
+                    Export-Clixml -Force -InputObject $InventoryThatErroredOut -Path "C:\Logs\InventoryErrored_$($Parameter.Subinventory).xml"
                 }
                 } | select -ExpandProperty TotalSeconds # end measure-command
                 Write-Host "$($Parameter.Subinventory): Time to complete query generation: $TimePerStore seconds" -BackgroundColor DarkGray -ForegroundColor Cyan
@@ -866,7 +874,7 @@ function Invoke-TervisShopifyInterfaceInventoryUpdate {
 function Get-TervisShopifyInventoryStagingTableCount {
     param (
         $SubinventoryCode
-    )    
+    )
     $Query = @"
         SELECT count(*) 
         FROM xxtrvs.xxinv_store_ohq
@@ -898,7 +906,7 @@ function New-TervisShopifyInventoryBulkAdjustQueryObject {
     param (
         [Parameter(Mandatory)][array]$InventoryArray,
         [Parameter(Mandatory)][string]$LocationGID,
-        $QueryLimit = 20
+        $QueryLimit = 100 # this is a limit imposed by Shopify
     )
     # Write-Warning "Initializing GraphQL query templates"
     $GraphQLHeader = @"
@@ -968,7 +976,8 @@ function Sync-TervisShopifyInventoryFromQueryObject {
     param (
         [Parameter(Mandatory,ValueFromPipelineByPropertyName)]$Query,
         [Parameter(Mandatory,ValueFromPipelineByPropertyName)][array]$EBSItemNumbers,
-        [Parameter(Mandatory,ValueFromPipelineByPropertyName)]$SubinventoryCode
+        [Parameter(Mandatory,ValueFromPipelineByPropertyName)]$SubinventoryCode,
+        [Parameter(Mandatory)]$ShopName
     )
     begin {
         $LogFile = "C:\Logs\ShopifyInventory.log"
@@ -976,23 +985,39 @@ function Sync-TervisShopifyInventoryFromQueryObject {
         $Queries = @()
     }
     process {
-        # Write-Warning "EBSItemNumbers in process: $EbsItemNumbers"
+        try{
+            $Response = Invoke-ShopifyAPIFunction -ShopName $ShopName -Body $Query
+            # If no errors, set EBS shopify flag
+            if (
+                -not $Response.data.inventoryBulkAdjustQuantityAtLocation.userErrors -and
+                -not $Response.errors
+                ) {
+                Set-TervisShopifyInventoryStagingTableUpdateFlag `
+                    -EBSItemNumbers $EBSItemNumbers `
+                    -SubinventoryCode $SubinventoryCode
+                $Synced = "Y"
+            } else { # Else, error handling. Log objects?
+                $Synced = "N"
+            }
+        } catch {
+            $Synced = "N"
+        }        
+
         $Queries += [PSCustomObject]@{
             Query = $Query
-            Numbers = $EBSItemNumbers
-            Location = $SubinventoryCode
+            EBSItemNumbers = $EBSItemNumbers
+            SubinventoryCode = $SubinventoryCode
+            Synced = $Synced
         }
     }
     end {
-        # Write-Warning "Testing SyncQuery - Query: $($Queries[0].Query)"
-        # Write-Warning "Testing SyncQuery - ItemNumbers: $($Queries[0].Numbers)"
-        # Write-Warning "Testing SyncQuery - Location: $($Queries[0].Location)"
         $DateTime = (Get-Date).ToString()
         $Queries | foreach {
             @"
 Time: $DateTime
-Location: $($_.Location)
-ItemNumbers: $($_.Numbers)
+Synced: $Synced
+SubinventoryCode: $($_.SubinventoryCode)
+EBSItemNumbers: $($_.EBSItemNumbers)
 Query:
 $($_.Query)
 
@@ -1000,7 +1025,41 @@ $($_.Query)
 "@
         } | Out-File -FilePath $LogFile -Append
         
-        $ObjectBackupFull = "$($ObjectBackup)_$($Queries[0].Location).xml"
+        $ObjectBackupFull = "$($ObjectBackup)_$($Queries[0].SubinventoryCode).xml"
         Export-Clixml -InputObject $Queries -Path $ObjectBackupFull -Force
     }
+}
+
+function Set-TervisShopifyInventoryStagingTableUpdateFlag {
+    param (
+        [Parameter(Mandatory)][array]$EBSItemNumbers,
+        [Parameter(Mandatory)]$SubinventoryCode,
+        [ValidateSet("Y","N")]$InterfacedFlag = "Y"
+    )
+    $EBSItemNumberSet = "('$($EBSItemNumbers -join "','")')"
+    $Query = @"
+        UPDATE xxtrvs.xxinv_store_ohq
+        SET interfaced_flag = '$InterfacedFlag', interfaced_date = sysdate
+        WHERE 1 = 1
+        AND item_number IN $EBSItemNumberSet
+        AND subinventory_code = '$SubinventoryCode'
+"@
+    Invoke-EBSSQL -SQLCommand $Query
+}
+
+function Set-TervisShopifyInventoryStagingTableUpdateFlagOnSyncedInventory {
+    param (
+        [Parameter(Mandatory)][array]$InventoryArray,
+        [Parameter(Mandatory)]$SubinventoryCode,
+        $QueryLimit = 1000 # EBS max array 
+    )
+
+    for ($i = 0; $i -lt $InventoryArray.Count; $i += $QueryLimit) {
+        $EBSItemNumbers = $InventoryArray[$i..($i + $QueryLimit - 1)].ITEM_NUMBER
+        Set-TervisShopifyInventoryStagingTableUpdateFlag `
+            -EBSItemNumbers $EBSItemNumbers `
+            -SubinventoryCode $SubinventoryCode
+    }
+
+    Export-Clixml -InputObject $InventoryArray -Path "C:\Logs\InventoryAlreadySynced_$SubinventoryCode.xml" -Force
 }
