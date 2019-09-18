@@ -157,12 +157,14 @@ function Invoke-TervisShopifyAddOrUpdateProduct {
     process {    
         try {
             $FoundShopifyProduct = Find-ShopifyProduct -ShopName $ShopName -SKU $ProductRecord.Item_Number
+            # Need to hrow error if more than one found 
             $NewOrUpdatedProduct = if ($FoundShopifyProduct) {
                     Update-ShopifyProduct -ShopName $ShopName `
                         -Id $FoundShopifyProduct.id `
                         -Title $ProductRecord.ITEM_DESCRIPTION `
                         -Handle $ProductRecord.ITEM_NUMBER `
                         -Sku $ProductRecord.ITEM_NUMBER `
+                        -VariantGID $FoundShopifyProduct.variants.edges.node.id `
                         -Barcode $ProductRecord.UPC `
                         -InventoryPolicy "CONTINUE" `
                         -Tracked true `
@@ -189,9 +191,13 @@ function Invoke-TervisShopifyAddOrUpdateProduct {
             Set-ShopifyRestProductChannel -ShopName $ShopName -Products $ShopifyRESTProduct -Channel global | Out-Null
             # Make item available at all locations -replace "[^0-9]"
             $InventoryItemLocations = Get-ShopifyInventoryItemLocations -ShopName $ShopName -InventoryItemId $ShopifyInventoryItemId
-            $MissingLocations = $Locations | Where-Object Name -NotIn $InventoryItemLocations.Name
-            foreach ($LocationId in $MissingLocations.id) {
-                Invoke-ShopifyInventoryActivate -InventoryItemId $ShopifyInventoryItemId -LocationId $LocationId -ShopName $ShopName | Out-Null
+            $MissingLocationIDs = $Locations | 
+                Where-Object Name -NotIn $InventoryItemLocations.Name |
+                Select-Object -ExpandProperty id | 
+                Get-ShopifyIdFromShopifyGid
+
+            $MissingLocationIDs | ForEach-Object {
+                Invoke-ShopifyInventoryActivate -InventoryItemId $ShopifyInventoryItemId -LocationId $_ -ShopName $ShopName | Out-Null
             }
 
             # Write back to EBS staging table
