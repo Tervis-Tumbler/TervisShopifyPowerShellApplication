@@ -157,7 +157,7 @@ function Invoke-TervisShopifyAddOrUpdateProduct {
     process {    
         try {
             $FoundShopifyProduct = Find-ShopifyProduct -ShopName $ShopName -SKU $ProductRecord.Item_Number
-            # Need to hrow error if more than one found 
+            if ($FoundShopifyProduct.count -gt 1) {throw "Duplicate items found. Cannot update item number $($ProductRecord.Item_Number)"}
             $NewOrUpdatedProduct = if ($FoundShopifyProduct) {
                     Update-ShopifyProduct -ShopName $ShopName `
                         -Id $FoundShopifyProduct.id `
