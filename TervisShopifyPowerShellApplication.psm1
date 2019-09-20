@@ -83,7 +83,7 @@ function Install-TervisShopifyPowerShellApplication_InventoryInterface {
         Install-PowerShellApplication @PowerShellApplicationParameters
         
         $PowerShellApplicationParameters.CommandString = @"
-Set-TervisEBSEnvironment -Name $Environment -ErrorAction SilentlyContinue
+Set-TervisEBSEnvironment -Name $Environment 2> `$null
 Set-TervisShopifyEnvironment -Environment $Environment
 "@
         $PowerShellApplicationParameters.ScriptFileName = "ParallelInitScript.ps1"
@@ -113,7 +113,7 @@ function Invoke-TervisShopifyInterfaceItemUpdate {
     )
     
     Write-Progress -Activity "Syncing products to Shopify" -CurrentOperation "Setting environment variables"
-    Set-TervisEBSEnvironment -Name $Environment -ErrorAction SilentlyContinue
+    Set-TervisEBSEnvironment -Name $Environment 2> $null
     Set-TervisShopifyEnvironment -Environment $Environment
 
     $ShopName = Get-TervisShopifyEnvironmentShopName -Environment $Environment
@@ -274,7 +274,7 @@ function Invoke-TervisShopifyInterfaceSalesImport {
     )
 
     Write-Progress -Activity "Shopify Sales Batch Interface" -CurrentOperation "Setting environment variables"
-    Set-TervisEBSEnvironment -Name $Environment
+    Set-TervisEBSEnvironment -Name $Environment 2> $null
     Set-TervisShopifyEnvironment -Environment $Environment
 
     $ShopName = Get-TervisShopifyEnvironmentShopName -Environment $Environment
@@ -469,6 +469,7 @@ function Get-TervisShopifyPaymentTypeCode {
         switch ($Transaction.gateway) {
             "cash" { "CHECK"; break }
             "shopify_payments" { "CREDIT_CARD"; break }
+            "gift_card" { "CASH"; break } # Pending. Need to see if this is the correct gateway.
             default { "UNKNOWN" }
         }
     }
@@ -791,7 +792,7 @@ function Invoke-TervisShopifyInterfaceInventoryUpdate {
     )
     
     Write-Progress -Activity "Shopify interface - inventory update" -CurrentOperation "Setting environment variables"
-    Set-TervisEBSEnvironment -Name $Environment
+    Set-TervisEBSEnvironment -Name $Environment 2> $null
     Set-TervisShopifyEnvironment -Environment $Environment
 
     $ShopName = Get-TervisShopifyEnvironmentShopName -Environment $Environment
@@ -813,7 +814,7 @@ function Invoke-TervisShopifyInterfaceInventoryUpdate {
                 $Parameter,
                 $OptionalParameters
             )
-            & $OptionalParameters[0]
+            & $OptionalParameters[0] 2> $null
             $ShopName = $OptionalParameters[1]
             # Get-ShopifyLocation -ShopName ospreystoredev -LocationName $Parameter.name
             # Get-TervisShopifyInventoryStagingTableUpdates -SubinventoryCode FL1 # 25 seconds for 100 records
