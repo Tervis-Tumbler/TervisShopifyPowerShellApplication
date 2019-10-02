@@ -235,7 +235,8 @@ function Invoke-TervisShopifyAddOrUpdateProduct {
         } catch {
             # Write-Warning "$($_.ITEM_NUMBER) could not be created on Shopify"
             Write-Warning $_
-            Write-EventLog -LogName Shopify -Source "Item Interface" -EntryType Warning -Message "Could not sync item $($ProductRecord.Item_Number) `nReason:`n$_"
+            Write-EventLog -LogName Shopify -Source "Item Interface" -EntryType Warning -EventId 3 `
+                -Message "Could not sync item $($ProductRecord.Item_Number) `nReason:`n$_"
             return $false
         }
     }
@@ -256,7 +257,8 @@ function Invoke-TervisShopifyRemoveProduct {
             return $true
         } catch {
             Write-Warning $_
-            Write-EventLog -LogName Shopify -Source "Item Interface" -EntryType Warning -Message "Could not sync item $($ProductRecord.Item_Number) `nReason:`n$_"
+            Write-EventLog -LogName Shopify -Source "Item Interface" -EntryType Warning -EventId 3 `
+                -Message "Could not sync item $($ProductRecord.Item_Number) `nReason:`n$_"
             return $false
         }
 
@@ -332,7 +334,7 @@ function Invoke-TervisShopifyInterfaceSalesImport {
         # Need to improve error handling, possibly isolate the order tagging
         # process so that an internet hiccup doesn't retrigger all the orders
         # at a later time.
-        Write-EventLog -LogName Shopify -Source "Sales Interface" -EntryType Error -EventId 1 `
+        Write-EventLog -LogName Shopify -Source "Sales Interface" -EntryType Error -EventId 2 `
                 -Message "Something went wrong. Reason:`n$_" 
         $_
     }
