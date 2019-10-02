@@ -4,8 +4,30 @@ function Invoke-TervisShopifyPowerShellApplicationProvision {
     )
     Invoke-ApplicationProvision -ApplicationName ShopifyInterface -EnvironmentName $EnvironmentName
     $Nodes = Get-TervisApplicationNode -ApplicationName ShopifyInterface -EnvironmentName $EnvironmentName
+    $Nodes | Install-TervisShopifyPowerShellApplicationLog
     $Nodes | Install-TervisShopifyPowerShellApplication_ItemInterface
     $Nodes | Install-TervisShopifyPowerShellApplication_InventoryInterface
+}
+
+function Install-TervisShopifyPowerShellApplicationLog {
+    param (
+        [Parameter(ValueFromPipelineByPropertyName)]$ComputerName,
+        [Parameter(ValueFromPipelineByPropertyName)]$EnvironmentName
+    )
+    begin {
+        $LogName = "Shopify"
+        $LogSources = `
+            "Item Interface",
+            "Sales Interface",
+            "Inventory Interface"
+    }
+    process {
+        try {
+            New-EventLog -ComputerName $ComputerName -LogName $LogName -Source $LogSources -ErrorAction
+        } catch [System.InvalidOperationException] {
+            Write-Warning "Log and sources already exist"
+        }
+    }
 }
 
 function Install-TervisShopifyPowerShellApplication_ItemInterface {
@@ -100,7 +122,7 @@ function Get-TervisShopifyEnvironmentShopName {
     )
 
     switch ($Environment) {
-        "Delta" {"ospreystoredev"; break}
+        "Delta" {"DLT-TervisStore"; break}
         "Epsilon" {"tervisteststore01"; break}
         "Production" {"tervisstore"; break}
         default {throw "Environment not recognized"}
@@ -133,18 +155,25 @@ function Invoke-TervisShopifyInterfaceItemUpdate {
 
     $NewRecordCount = Get-TervisShopifyItemStagingTableCount
     if ($NewRecordCount -gt 0) {
-        $i = 0
         Write-Progress -Activity "Syncing products to Shopify" -CurrentOperation "Getting product records"
+        Write-EventLog -LogName Shopify -Source "Item Interface" -EntryType Information -EventId 1 `
+            -Message "Starting Shopify sync on $NewRecordCount items." 
+        $i = 0
         $NewRecords = Get-TervisShopifyItemStagingTableUpdates
         # Start-ParallelWork -ScriptBlock $ProductUpdateScriptBlock -Parameters $NewRecords -OptionalParameters $OtherParams -MaxConcurrentJobs $MaxConcurrentRequests
         $NewRecords | ForEach-Object {
-            $i++; Write-Progress -Activity "Syncing products to Shopify" -Status "$i of $NewRecordCount" -PercentComplete ($i * 100 / $NewRecordCount) -CurrentOperation "Processing EBS item #$($_.ITEM_NUMBER)" -SecondsRemaining (($NewRecordCount - $i) * 4)
-            if ($_.ITEM_STATUS -in "Active","DTCDeplete") {
+            $i++
+            Write-Progress -Activity "Syncing products to Shopify" -Status "$i of $NewRecordCount" `
+                -PercentComplete ($i * 100 / $NewRecordCount) -CurrentOperation "Processing EBS item #$($_.ITEM_NUMBER)" -SecondsRemaining (($NewRecordCount - $i) * 4)
+            $isSuccessful = @()
+            $isSuccessful += if ($_.ITEM_STATUS -in "Active","DTCDeplete") {
                 $_ | Invoke-TervisShopifyAddOrUpdateProduct -ShopName $ShopName -Locations $Locations
             } else {
                 $_ | Invoke-TervisShopifyRemoveProduct -ShopName $ShopName
             }
         }
+        Write-EventLog -LogName Shopify -Source "Item Interface" -EntryType Information -EventId 1 `
+            -Message "Completed Shopify item sync.`nSuccessful: $($isSuccessful.Where({$_ -eq $true}).count)`nFailed: $($isSuccessful.Where({$_ -eq $false}).count)"
     }
 }
 
@@ -202,9 +231,12 @@ function Invoke-TervisShopifyAddOrUpdateProduct {
 
             # Write back to EBS staging table
             Set-TervisShopifyItemStagingTableUpdateFlag -EbsItemNumber $NewOrUpdatedProduct.variants.edges.node.inventoryItem.sku
+            return $true
         } catch {
             # Write-Warning "$($_.ITEM_NUMBER) could not be created on Shopify"
-            Write-Error $_
+            Write-Warning $_
+            Write-EventLog -LogName Shopify -Source "Item Interface" -EntryType Warning -Message "Could not sync item $($ProductRecord.Item_Number) `nReason:`n$_"
+            return $false
         }
     }
 }
@@ -221,8 +253,11 @@ function Invoke-TervisShopifyRemoveProduct {
                 Remove-ShopifyProduct -GlobalId $ShopifyProduct.id -ShopName $ShopName | Out-Null
             }
             Set-TervisShopifyItemStagingTableUpdateFlag -EbsItemNumber $ProductRecord.ITEM_NUMBER
+            return $true
         } catch {
-            Write-Error $_
+            Write-Warning $_
+            Write-EventLog -LogName Shopify -Source "Item Interface" -EntryType Warning -Message "Could not sync item $($ProductRecord.Item_Number) `nReason:`n$_"
+            return $false
         }
 
     }
@@ -276,12 +311,14 @@ function Invoke-TervisShopifyInterfaceSalesImport {
     Write-Progress -Activity "Shopify Sales Batch Interface" -CurrentOperation "Setting environment variables"
     Set-TervisEBSEnvironment -Name $Environment 2> $null
     Set-TervisShopifyEnvironment -Environment $Environment
-
+    
     $ShopName = Get-TervisShopifyEnvironmentShopName -Environment $Environment
-
+    
     try {
         Write-Progress -Activity "Shopify Sales Batch Interface" -CurrentOperation "Getting orders"
         $ShopifyOrders = Get-TervisShopifyOrdersNotTaggedWithEBS -ShopName $ShopName
+        Write-EventLog -LogName Shopify -Source "Sales Interface" -EntryType Information -EventId 1 `
+                -Message "Starting Shopify sync on $NewRecordCount items." 
         Write-Progress -Activity "Shopify Sales Batch Interface" -CurrentOperation "Converting orders to EBS format"
         $ConvertedOrderLines = $ShopifyOrders | Convert-TervisShopifyOrderToEBSOrderLines
         $ConvertedOrderHeaders = $ShopifyOrders | Convert-TervisShopifyOrderToEBSOrderLineHeader
@@ -295,6 +332,8 @@ function Invoke-TervisShopifyInterfaceSalesImport {
         # Need to improve error handling, possibly isolate the order tagging
         # process so that an internet hiccup doesn't retrigger all the orders
         # at a later time.
+        Write-EventLog -LogName Shopify -Source "Sales Interface" -EntryType Error -EventId 1 `
+                -Message "Something went wrong. Reason:`n$_" 
         $_
     }
 }
@@ -425,7 +464,7 @@ function Convert-TervisShopifyPaymentsToEBSPayment {
         $LocationDefinition = Get-TervisShopifyLocationDefinition -City $Order.physicalLocation.address.city
         $OrderId = $Order.id | Get-ShopifyIdFromShopifyGid
         $StoreNumber = $LocationDefinition.RMSStoreNumber
-        $StoreCustomerNumber = $LocationDefinition.CustomerNumber
+        # $StoreCustomerNumber = $LocationDefinition.CustomerNumber
         $ORIG_SYS_DOCUMENT_REF = "$StoreNumber-$OrderId"
         $PaymentTypeCode = $Transaction | Get-TervisShopifyPaymentTypeCode
         $PaymentCollectionEvent = $Transaction | Get-TervisShopifyPaymentCollectionEvent
@@ -826,7 +865,7 @@ function Invoke-TervisShopifyInterfaceInventoryUpdate {
                 Write-Warning "$($Parameter.Subinventory): Testing InventoryUpdates - Count: $($InventoryUpdates.Count)"
                 #Get current inventory - Get-ShopifyInventoryAtLocation
                 # Measure-Command {
-                    $InventoryUpdates | foreach {
+                    $InventoryUpdates | ForEach-Object {
                         # Write-Warning "Getting Inventory levels at location"
                         $InventoryItem = Get-ShopifyInventoryLevelAtLocation `
                             -ShopName $ShopName `
@@ -867,7 +906,7 @@ function Invoke-TervisShopifyInterfaceInventoryUpdate {
                 if ($InventoryThatErroredOut) {
                     Export-Clixml -Force -InputObject $InventoryThatErroredOut -Path "C:\Logs\InventoryErrored_$($Parameter.Subinventory).xml"
                 }
-                } | select -ExpandProperty TotalSeconds # end measure-command
+                } | Select-Object -ExpandProperty TotalSeconds # end measure-command
                 Write-Host "$($Parameter.Subinventory): Time to complete query generation: $TimePerStore seconds" -BackgroundColor DarkGray -ForegroundColor Cyan
             }
             else {Write-Warning "$($Parameter.Subinventory): No new records"}
@@ -1017,7 +1056,7 @@ function Sync-TervisShopifyInventoryFromQueryObject {
     }
     end {
         $DateTime = (Get-Date).ToString()
-        $Queries | foreach {
+        $Queries | ForEach-Object {
             @"
 Time: $DateTime
 Synced: $Synced
