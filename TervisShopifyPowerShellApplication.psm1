@@ -23,7 +23,7 @@ function Install-TervisShopifyPowerShellApplicationLog {
     }
     process {
         try {
-            New-EventLog -ComputerName $ComputerName -LogName $LogName -Source $LogSources -ErrorAction
+            New-EventLog -ComputerName $ComputerName -LogName $LogName -Source $LogSources -ErrorAction Stop
         } catch [System.InvalidOperationException] {
             Write-Warning "Log and sources already exist"
         }
