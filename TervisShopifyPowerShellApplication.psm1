@@ -141,31 +141,18 @@ function Invoke-TervisShopifyInterfaceItemUpdate {
     $ShopName = Get-TervisShopifyEnvironmentShopName -Environment $Environment
     $Locations = Get-ShopifyLocation -ShopName $ShopName -LocationName *
 
-    # $ProductUpdateScriptBlock = {
-    #     param($Parameter,$OptionalParameters)
-    #     Set-TervisShopifyEnvironment -Environment dev
-    #     Set-TervisEBSEnvironment -Name Delta
-    #     if ($Parameter.ITEM_STATUS -in "Active","DTCDeplete") {
-    #         $Parameter | Invoke-TervisShopifyAddOrUpdateProduct -ShopName $OptionalParameters.ShopName -Locations $OptionalParameters.Locations
-    #     } else {
-    #         $Parameter | Invoke-TervisShopifyRemoveProduct -ShopName $OptionalParameters.ShopName
-    #     }
-    # }
-    # $MaxConcurrentRequests = 3
-
     $NewRecordCount = Get-TervisShopifyItemStagingTableCount
     if ($NewRecordCount -gt 0) {
         Write-Progress -Activity "Syncing products to Shopify" -CurrentOperation "Getting product records"
         Write-EventLog -LogName Shopify -Source "Item Interface" -EntryType Information -EventId 1 `
             -Message "Starting Shopify sync on $NewRecordCount items." 
         $i = 0
+        $isSuccessful = @()
         $NewRecords = Get-TervisShopifyItemStagingTableUpdates
-        # Start-ParallelWork -ScriptBlock $ProductUpdateScriptBlock -Parameters $NewRecords -OptionalParameters $OtherParams -MaxConcurrentJobs $MaxConcurrentRequests
         $NewRecords | ForEach-Object {
             $i++
             Write-Progress -Activity "Syncing products to Shopify" -Status "$i of $NewRecordCount" `
                 -PercentComplete ($i * 100 / $NewRecordCount) -CurrentOperation "Processing EBS item #$($_.ITEM_NUMBER)" -SecondsRemaining (($NewRecordCount - $i) * 4)
-            $isSuccessful = @()
             $isSuccessful += if ($_.ITEM_STATUS -in "Active","DTCDeplete") {
                 $_ | Invoke-TervisShopifyAddOrUpdateProduct -ShopName $ShopName -Locations $Locations
             } else {
