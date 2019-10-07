@@ -829,6 +829,8 @@ function Invoke-TervisShopifyInterfaceInventoryUpdate {
     $NewRecordCount = Get-TervisShopifyInventoryStagingTableCount
     if ($NewRecordCount -gt 0) {
         # Get active locations with relevant information, like subinventory code
+        Write-EventLog -LogName Shopify -Source "Inventory Interface" -EntryType Information -EventId 1 `
+            -Message "Starting Shopify inventory sync on $NewRecordCount items." 
         Write-Progress -Activity "Shopify interface - inventory update" -CurrentOperation "Setting Shopify locations"
         $Locations = Get-TervisShopifyActiveLocations -ShopName $ShopName  #| select -first 2 #| ? SUBINVENTORY -EQ "FL0"
         #foreach location
@@ -837,7 +839,7 @@ function Invoke-TervisShopifyInterfaceInventoryUpdate {
         # Start parallel jobs with objects + initialization script + creds
         $InitializationExpression = "$ScriptRoot\ParallelInitScript.ps1"
         Write-Progress -Activity "Shopify interface - inventory update" -CurrentOperation "Starting parallel work"
-        Start-ParallelWork -MaxConcurrentJobs 4 -ScriptBlock {
+        Start-ParallelWork -Parameters $Locations -OptionalParameters $InitializationExpression,$ShopName -MaxConcurrentJobs 4 -ScriptBlock {
             param (
                 $Parameter,
                 $OptionalParameters
@@ -896,10 +898,17 @@ function Invoke-TervisShopifyInterfaceInventoryUpdate {
                     Export-Clixml -Force -InputObject $InventoryThatErroredOut -Path "C:\Logs\InventoryErrored_$($Parameter.Subinventory).xml"
                 }
                 } | Select-Object -ExpandProperty TotalSeconds # end measure-command
-                Write-Host "$($Parameter.Subinventory): Time to complete query generation: $TimePerStore seconds" -BackgroundColor DarkGray -ForegroundColor Cyan
+                # Write-Host "$($Parameter.Subinventory): Time to complete query generation: $TimePerStore seconds" -BackgroundColor DarkGray -ForegroundColor Cyan
+                Write-EventLog -LogName Shopify -Source "Inventory Interface" -EntryType Information -EventId 1 -Message @"
+Inventory processed for $($Parameter.Subinventory) in $TimePerStore seconds.
+Inventory items adjusted: $($InventoryToBeAdjusted.Count)
+Inventory items already in sync: $($InventoryAlreadySynced.Count)
+Inventory items in EBS but not Shopify: $($InventoryThatErroredOut.Count)
+Total inventory items: $($InventoryUpdates.Count)
+"@
             }
             else {Write-Warning "$($Parameter.Subinventory): No new records"}
-        } -Parameters $Locations -OptionalParameters $InitializationExpression,$ShopName
+        }
     }
 
 }
@@ -1013,8 +1022,8 @@ function Sync-TervisShopifyInventoryFromQueryObject {
         [Parameter(Mandatory)]$ShopName
     )
     begin {
-        $LogFile = "C:\Logs\ShopifyInventory.log"
-        $ObjectBackup = "C:\Logs\InventorySyncObjects"
+        # $LogFile = "C:\Logs\ShopifyInventory.log"
+        # $ObjectBackup = "C:\Logs\InventorySyncObjects"
         $Queries = @()
     }
     process {
@@ -1031,9 +1040,11 @@ function Sync-TervisShopifyInventoryFromQueryObject {
                 $Synced = "Y"
             } else { # Else, error handling. Log objects?
                 $Synced = "N"
+                $ErrMsg = ""
             }
         } catch {
             $Synced = "N"
+            $ErrMsg = $_
         }        
 
         $Queries += [PSCustomObject]@{
@@ -1041,25 +1052,40 @@ function Sync-TervisShopifyInventoryFromQueryObject {
             EBSItemNumbers = $EBSItemNumbers
             SubinventoryCode = $SubinventoryCode
             Synced = $Synced
+            ErrorMessage = $ErrMsg
         }
     }
     end {
-        $DateTime = (Get-Date).ToString()
-        $Queries | ForEach-Object {
-            @"
-Time: $DateTime
-Synced: $Synced
-SubinventoryCode: $($_.SubinventoryCode)
-EBSItemNumbers: $($_.EBSItemNumbers)
+#         $DateTime = (Get-Date).ToString()
+#         $Queries | ForEach-Object {
+#             @"
+# Time: $DateTime
+# Synced: $Synced
+# SubinventoryCode: $($_.SubinventoryCode)
+# EBSItemNumbers: $($_.EBSItemNumbers)
+# Query:
+# $($_.Query)
+
+
+# "@
+#         } | Out-File -FilePath $LogFile -Append
+        
+#         $ObjectBackupFull = "$($ObjectBackup)_$($Queries[0].SubinventoryCode).xml"
+#         Export-Clixml -InputObject $Queries -Path $ObjectBackupFull -Force
+        $Queries | Where-Object Synced -EQ "N" | ForEach-Object {
+            Write-EventLog -LogName Shopify -Source "Inventory Interface" -EntryType Warning -EventId 2 -Message @"
+Could not sync $($_.EBSItemNumbers.Count) inventory items to Shopify.
+
+Error:
+$($_.ErrorMessage)
+
+Inventory Items:
+$(($_.EBSItemNumbers) -join "`n")
+
 Query:
 $($_.Query)
-
-
 "@
-        } | Out-File -FilePath $LogFile -Append
-        
-        $ObjectBackupFull = "$($ObjectBackup)_$($Queries[0].SubinventoryCode).xml"
-        Export-Clixml -InputObject $Queries -Path $ObjectBackupFull -Force
+        }
     }
 }
 
