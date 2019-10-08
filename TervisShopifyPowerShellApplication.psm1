@@ -852,7 +852,10 @@ function Invoke-TervisShopifyInterfaceInventoryUpdate {
             # Get-TervisShopifyInventoryStagingTableUpdates -SubinventoryCode FL1 # 25 seconds for 100 records
             # $InventoryUpdates
             Write-Warning "$($Parameter.Subinventory): Getting inventory updates"
-            if ((Get-TervisShopifyInventoryStagingTableCount -SubinventoryCode $Parameter.Subinventory) -gt 0) {
+            if (
+                $Parameter.Subinventory -and
+                (Get-TervisShopifyInventoryStagingTableCount -SubinventoryCode $Parameter.Subinventory) -gt 0
+            ) {
                 $TimePerStore = Measure-Command { # to measure process per store
                 $InventoryUpdates = Get-TervisShopifyInventoryStagingTableUpdates -SubinventoryCode $Parameter.Subinventory #| select -first 1000
                 Write-Warning "$($Parameter.Subinventory): Testing InventoryUpdates - Count: $($InventoryUpdates.Count)"
@@ -902,14 +905,23 @@ function Invoke-TervisShopifyInterfaceInventoryUpdate {
                 } | Select-Object -ExpandProperty TotalSeconds # end measure-command
                 # Write-Host "$($Parameter.Subinventory): Time to complete query generation: $TimePerStore seconds" -BackgroundColor DarkGray -ForegroundColor Cyan
                 Write-EventLog -LogName Shopify -Source "Inventory Interface" -EntryType Information -EventId 1 -Message @"
-Inventory processed for $($Parameter.Subinventory) in $TimePerStore seconds.
+Inventory processed for `"$($Parameter.Name)`" in $TimePerStore seconds.
 Inventory items adjusted: $($InventoryToBeAdjusted.Count)
 Inventory items already in sync: $($InventoryAlreadySynced.Count)
 Inventory items in EBS but not Shopify: $($InventoryThatErroredOut.Count)
 Total inventory items: $($InventoryUpdates.Count)
 "@
             }
-            else {Write-Warning "$($Parameter.Subinventory): No new records"}
+            elseif (-not $Parameter.Subinventory) {
+                Write-EventLog -LogName Shopify -Source "Inventory Interface" -EntryType Warning -EventId 2 `
+                    -Message "No subinventory code found for `"$($Parameter.Name)`". Check the LocationDefinition.csv and make sure it is current."            
+            }
+            else {
+                Write-Warning "$($Parameter.Subinventory): No new records"
+                Write-EventLog -LogName Shopify -Source "Inventory Interface" -EntryType Information -EventId 1 `
+                -Message "No inventory changes found for `"$($Parameter.Name)`"."            
+
+            }
         }
     }
 
@@ -1122,5 +1134,5 @@ function Set-TervisShopifyInventoryStagingTableUpdateFlagOnSyncedInventory {
             -SubinventoryCode $SubinventoryCode
     }
 
-    Export-Clixml -InputObject $InventoryArray -Path "C:\Logs\InventoryAlreadySynced_$SubinventoryCode.xml" -Force
+    # Export-Clixml -InputObject $InventoryArray -Path "C:\Logs\InventoryAlreadySynced_$SubinventoryCode.xml" -Force
 }
