@@ -98,15 +98,15 @@ function Install-TervisShopifyPowerShellApplication_InventoryInterface {
             NugetDependencies = "Oracle.ManagedDataAccess.Core"
             ScheduledTaskName = "ShopifyInventoryInterface"
             RepetitionIntervalName = "EveryDayAt3am"
-            CommandString = "Invoke-TervisShopifyInterfaceInventoryUpdate -Environment $EnvironmentName -ScriptRoot '`$PowerShellApplicationInstallDirectory'"
+            CommandString = "Invoke-TervisShopifyInterfaceInventoryUpdate -Environment $EnvironmentName -ScriptRoot `$PowerShellApplicationInstallDirectory"
             ScheduledTasksCredential = $ScheduledTasksCredential
         }
         
         Install-PowerShellApplication @PowerShellApplicationParameters
         
         $PowerShellApplicationParameters.CommandString = @"
-Set-TervisEBSEnvironment -Name $Environment 2> `$null
-Set-TervisShopifyEnvironment -Environment $Environment
+Set-TervisEBSEnvironment -Name $EnvironmentName 2> `$null
+Set-TervisShopifyEnvironment -Environment $EnvironmentName
 "@
         $PowerShellApplicationParameters.ScriptFileName = "ParallelInitScript.ps1"
         $PowerShellApplicationParameters.Remove("RepetitionIntervalName")
