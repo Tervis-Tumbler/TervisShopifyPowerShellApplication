@@ -98,7 +98,7 @@ function Install-TervisShopifyPowerShellApplication_InventoryInterface {
             NugetDependencies = "Oracle.ManagedDataAccess.Core"
             ScheduledTaskName = "ShopifyInventoryInterface"
             RepetitionIntervalName = "EveryDayAt3am"
-            CommandString = "Invoke-TervisShopifyInterfaceInventoryUpdate -Environment $EnvironmentName -ScriptRoot $PSScriptRoot"
+            CommandString = "Invoke-TervisShopifyInterfaceInventoryUpdate -Environment $EnvironmentName -ScriptRoot `$PSScriptRoot"
             ScheduledTasksCredential = $ScheduledTasksCredential
         }
         
@@ -304,27 +304,24 @@ function Invoke-TervisShopifyInterfaceSalesImport {
     $ShopName = Get-TervisShopifyEnvironmentShopName -Environment $Environment
     
     try {
-        Write-Progress -Activity "Shopify Sales Batch Interface" -CurrentOperation "Getting orders"
+        # Write-Progress -Activity "Shopify Sales Batch Interface" -CurrentOperation "Getting orders"
         $ShopifyOrders = Get-TervisShopifyOrdersNotTaggedWithEBS -ShopName $ShopName
         Write-EventLog -LogName Shopify -Source "Sales Interface" -EntryType Information -EventId 1 `
-                -Message "Starting Shopify sync on $NewRecordCount items." 
-        Write-Progress -Activity "Shopify Sales Batch Interface" -CurrentOperation "Converting orders to EBS format"
+                -Message "Starting Shopify order import." 
+        # Write-Progress -Activity "Shopify Sales Batch Interface" -CurrentOperation "Converting orders to EBS format"
         $ConvertedOrderLines = $ShopifyOrders | Convert-TervisShopifyOrderToEBSOrderLines
         $ConvertedOrderHeaders = $ShopifyOrders | Convert-TervisShopifyOrderToEBSOrderLineHeader
         $Subqueries = $ConvertedOrderLines | New-EBSOrderLineSubquery
         $Subqueries += $ConvertedOrderHeaders | New-EBSOrderLineHeaderSubquery
-        Write-Progress -Activity "Shopify Sales Batch Interface" -CurrentOperation "Sending orders to EBS"
-        $Subqueries | Invoke-EBSSubqueryInsert
-        Write-Progress -Activity "Shopify Sales Batch Interface" -CurrentOperation "Tagging orders sent to EBS"
-        $ShopifyOrders | Set-ShopifyOrderTag -ShopName $ShopName -AddTag "SentToEBS"
+        # Write-Progress -Activity "Shopify Sales Batch Interface" -CurrentOperation "Sending orders to EBS"
     } catch {
-        # Need to improve error handling, possibly isolate the order tagging
-        # process so that an internet hiccup doesn't retrigger all the orders
-        # at a later time.
         Write-EventLog -LogName Shopify -Source "Sales Interface" -EntryType Error -EventId 2 `
-                -Message "Something went wrong. Reason:`n$_" 
+        -Message "Something went wrong. Reason:`n$_" 
         $_
     }
+    $Subqueries | Invoke-EBSSubqueryInsert # TAKE THESE ONE BY ONE AND PROCESS AS LINE, HEADER, THEN TAG IN SHOPIFY
+    # Write-Progress -Activity "Shopify Sales Batch Interface" -CurrentOperation "Tagging orders sent to EBS"
+    $ShopifyOrders | Set-ShopifyOrderTag -ShopName $ShopName -AddTag "ImportedToEBS"
 }
 
 function Convert-TervisShopifyOrderToEBSOrderLines {
@@ -809,7 +806,12 @@ function Invoke-EBSSubqueryInsert {
     }
     end {
         $FinalQuery += "`nSELECT 1 FROM DUAL"
-        Invoke-EBSSQL -SQLCommand $FinalQuery
+        try {
+            Invoke-EBSSQL -SQLCommand $FinalQuery
+            return $true
+        } catch {
+            return $false
+        }
     }
 }
 
