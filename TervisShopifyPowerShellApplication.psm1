@@ -292,36 +292,67 @@ function Set-TervisShopifyItemStagingTableUpdateFlag {
     Invoke-EBSSQL -SQLCommand $Query
 }
 
-function Invoke-TervisShopifyInterfaceSalesImport {
+function Invoke-TervisShopifyInterfaceOrderImport {
     param (
         [Parameter(Mandatory)][ValidateSet("Delta","Epsilon","Production")]$Environment
     )
 
-    Write-Progress -Activity "Shopify Sales Batch Interface" -CurrentOperation "Setting environment variables"
+    Write-Progress -Activity "Shopify Order Import Interface" -CurrentOperation "Setting environment variables"
     Set-TervisEBSEnvironment -Name $Environment 2> $null
     Set-TervisShopifyEnvironment -Environment $Environment
     
     $ShopName = Get-TervisShopifyEnvironmentShopName -Environment $Environment
     
     try {
-        # Write-Progress -Activity "Shopify Sales Batch Interface" -CurrentOperation "Getting orders"
-        $ShopifyOrders = Get-TervisShopifyOrdersNotTaggedWithEBS -ShopName $ShopName
+        Write-Progress -Activity "Shopify Order Import Interface" -CurrentOperation "Getting orders"
+        $ShopifyOrders = Get-TervisShopifyOrdersForImport -ShopName $ShopName
         Write-EventLog -LogName Shopify -Source "Sales Interface" -EntryType Information -EventId 1 `
-                -Message "Starting Shopify order import." 
-        # Write-Progress -Activity "Shopify Sales Batch Interface" -CurrentOperation "Converting orders to EBS format"
-        $ConvertedOrderLines = $ShopifyOrders | Convert-TervisShopifyOrderToEBSOrderLines
-        $ConvertedOrderHeaders = $ShopifyOrders | Convert-TervisShopifyOrderToEBSOrderLineHeader
-        $Subqueries = $ConvertedOrderLines | New-EBSOrderLineSubquery
-        $Subqueries += $ConvertedOrderHeaders | New-EBSOrderLineHeaderSubquery
-        # Write-Progress -Activity "Shopify Sales Batch Interface" -CurrentOperation "Sending orders to EBS"
+            -Message "Starting Shopify order import for $($ShopifyOrders.Count) orders." 
     } catch {
         Write-EventLog -LogName Shopify -Source "Sales Interface" -EntryType Error -EventId 2 `
-        -Message "Something went wrong. Reason:`n$_" 
-        $_
+            -Message "Something went wrong. Reason:`n$_" 
+            $_
     }
-    $Subqueries | Invoke-EBSSubqueryInsert # TAKE THESE ONE BY ONE AND PROCESS AS LINE, HEADER, THEN TAG IN SHOPIFY
-    # Write-Progress -Activity "Shopify Sales Batch Interface" -CurrentOperation "Tagging orders sent to EBS"
-    $ShopifyOrders | Set-ShopifyOrderTag -ShopName $ShopName -AddTag "ImportedToEBS"
+    $i = 0
+    $ShopifyOrders | ForEach-Object {
+        $i++
+        Write-Progress -Activity "Shopify Order Import Interface" -CurrentOperation "Converting orders to EBS format" `
+            -PercentComplete ($i * 100 / $ShopifyOrders.Count)
+        try {
+            if (-not (Test-TervisShopifyEBSOrderExists -Order $_)) {
+                $ConvertedOrderHeader = $_ | Convert-TervisShopifyOrderToEBSOrderLineHeader
+                $ConvertedOrderLines = $_ | Convert-TervisShopifyOrderToEBSOrderLines
+                $ConvertedOrderPayment = $_ | Convert-TervisShopifyPaymentsToEBSPayment # Need to account for split payments
+                [array]$Subqueries = $ConvertedOrderHeader | New-EBSOrderLineHeaderSubquery
+                $Subqueries += $ConvertedOrderLines | New-EBSOrderLineSubquery
+                $Subqueries += $ConvertedOrderPayment | New-EBSOrderLinePaymentSubquery
+                $Subqueries | Invoke-EBSSubqueryInsert
+            }
+            $_ | Set-ShopifyOrderTag -ShopName $ShopName -AddTag "ImportedToEBS"
+        } catch {
+            Write-EventLog -LogName Shopify -Source "Sales Interface" -EntryType Error -EventId 2 `
+                -Message "Something went wrong. Reason:`n$_" 
+        }
+    }
+}
+
+function Test-TervisShopifyEBSOrderExists {
+    param (
+        [Parameter(Mandatory,ValueFromPipeline)]$Order
+    )
+    process {
+        $Query = @"
+            SELECT orig_sys_document_ref
+            FROM xxoe_headers_iface_all
+            WHERE orig_sys_document_ref = '$($Order.EBSDocumentReference)'
+"@
+        try {
+            $Result = Invoke-EBSSQL -SQLCommand $Query
+        } catch {
+            throw "Could not connect to EBS to check order $($Order.EBSDocumentReference)"
+        }
+        if ($Result) {return $true} else {return $false}
+    }
 }
 
 function Convert-TervisShopifyOrderToEBSOrderLines {
@@ -329,12 +360,13 @@ function Convert-TervisShopifyOrderToEBSOrderLines {
         [Parameter(Mandatory,ValueFromPipeline)]$Order
     )
     process {
-        $LocationDefinition = Get-TervisShopifyLocationDefinition -City $Order.physicalLocation.address.city
+        # $LocationDefinition = Get-TervisShopifyLocationDefinition -City $Order.physicalLocation.address.city
         # May need to adjust this for local time based on location 
         # $DateString = Get-Date -Date ([datetime]::Parse($Order.createdat).toLocalTime()) -Format yyyyMMdd_HHmmss_ffff
-        $OrderId = $Order.id | Get-ShopifyIdFromShopifyGid
-        $StoreNumber = $LocationDefinition.RMSStoreNumber
-        $ORIG_SYS_DOCUMENT_REF = "$StoreNumber-$OrderId"
+        # $OrderId = $Order.id | Get-ShopifyIdFromShopifyGid
+        # $StoreNumber = $LocationDefinition.RMSStoreNumber
+        # $ORIG_SYS_DOCUMENT_REF = "$StoreNumber-$OrderId"
+        $ORIG_SYS_DOCUMENT_REF = $Order.EBSDocumentReference
         $OrderLineNumber = 0
         $Order.lineItems.edges.node | ForEach-Object {
             $OrderLineNumber++
@@ -393,11 +425,12 @@ function Convert-TervisShopifyOrderToEBSOrderLineHeader {
         [Parameter(Mandatory,ValueFromPipeline)]$Order
     )
     process {
-        $LocationDefinition = Get-TervisShopifyLocationDefinition -City $Order.physicalLocation.address.city
-        $OrderId = $Order.id | Get-ShopifyIdFromShopifyGid
-        $StoreNumber = $LocationDefinition.RMSStoreNumber
+        # $LocationDefinition = Get-TervisShopifyLocationDefinition -City $Order.physicalLocation.address.city
+        # $OrderId = $Order.id | Get-ShopifyIdFromShopifyGid
+        # $StoreNumber = $LocationDefinition.RMSStoreNumber
+        # $ORIG_SYS_DOCUMENT_REF = "$StoreNumber-$OrderId"
+        $ORIG_SYS_DOCUMENT_REF = $Order.EBSDocumentReference
         $StoreCustomerNumber = $LocationDefinition.CustomerNumber
-        $ORIG_SYS_DOCUMENT_REF = "$StoreNumber-$OrderId"
 
         [PSCustomObject]@{
             ORDER_SOURCE_ID = "1022" # For use during testing payments
@@ -447,11 +480,12 @@ function Convert-TervisShopifyPaymentsToEBSPayment {
     )
     process {
         $Transaction = $Order | Get-ShopifyRestOrderTransactionDetail -ShopName $ShopName
-        $LocationDefinition = Get-TervisShopifyLocationDefinition -City $Order.physicalLocation.address.city
-        $OrderId = $Order.id | Get-ShopifyIdFromShopifyGid
-        $StoreNumber = $LocationDefinition.RMSStoreNumber
+        # $LocationDefinition = Get-TervisShopifyLocationDefinition -City $Order.physicalLocation.address.city
+        # $OrderId = $Order.id | Get-ShopifyIdFromShopifyGid
+        # $StoreNumber = $LocationDefinition.RMSStoreNumber
         # $StoreCustomerNumber = $LocationDefinition.CustomerNumber
-        $ORIG_SYS_DOCUMENT_REF = "$StoreNumber-$OrderId"
+        # $ORIG_SYS_DOCUMENT_REF = "$StoreNumber-$OrderId"
+        $ORIG_SYS_DOCUMENT_REF = $Order.EBSDocumentReference
         $PaymentTypeCode = $Transaction | Get-TervisShopifyPaymentTypeCode
         $PaymentCollectionEvent = $Transaction | Get-TervisShopifyPaymentCollectionEvent
         $CreditCardNumber = $Transaction | New-TervisShopifyCCDummyNumber
