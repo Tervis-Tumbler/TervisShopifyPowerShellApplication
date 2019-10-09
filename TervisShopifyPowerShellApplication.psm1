@@ -18,7 +18,7 @@ function Install-TervisShopifyPowerShellApplicationLog {
         $LogName = "Shopify"
         $LogSources = `
             "Item Interface",
-            "Sales Interface",
+            "Order Interface",
             "Inventory Interface"
     }
     process {
@@ -123,7 +123,7 @@ function Get-TervisShopifyEnvironmentShopName {
 
     switch ($Environment) {
         "Delta" {"DLT-TervisStore"; break}
-        "Epsilon" {"tervisteststore01"; break}
+        "Epsilon" {"DLT-TervisStore"; break}
         "Production" {"tervisstore"; break}
         default {throw "Environment not recognized"}
     }
@@ -305,15 +305,16 @@ function Invoke-TervisShopifyInterfaceOrderImport {
     
     try {
         Write-Progress -Activity "Shopify Order Import Interface" -CurrentOperation "Getting orders"
-        $ShopifyOrders = Get-TervisShopifyOrdersForImport -ShopName $ShopName
-        Write-EventLog -LogName Shopify -Source "Sales Interface" -EntryType Information -EventId 1 `
-            -Message "Starting Shopify order import for $($ShopifyOrders.Count) orders." 
+        [array]$ShopifyOrders = Get-TervisShopifyOrdersForImport -ShopName $ShopName
+        Write-EventLog -LogName Shopify -Source "Order Interface" -EntryType Information -EventId 1 `
+            -Message "Starting Shopify order import. Processing $($ShopifyOrders.Count) order(s)." 
     } catch {
-        Write-EventLog -LogName Shopify -Source "Sales Interface" -EntryType Error -EventId 2 `
+        Write-EventLog -LogName Shopify -Source "Order Interface" -EntryType Error -EventId 2 `
             -Message "Something went wrong. Reason:`n$_" 
             $_
     }
     $i = 0
+    $OrdersProcessed = 0
     $ShopifyOrders | ForEach-Object {
         $i++
         Write-Progress -Activity "Shopify Order Import Interface" -CurrentOperation "Converting orders to EBS format" `
@@ -322,18 +323,21 @@ function Invoke-TervisShopifyInterfaceOrderImport {
             if (-not (Test-TervisShopifyEBSOrderExists -Order $_)) {
                 $ConvertedOrderHeader = $_ | Convert-TervisShopifyOrderToEBSOrderLineHeader
                 $ConvertedOrderLines = $_ | Convert-TervisShopifyOrderToEBSOrderLines
-                $ConvertedOrderPayment = $_ | Convert-TervisShopifyPaymentsToEBSPayment # Need to account for split payments
+                $ConvertedOrderPayment = $_ | Convert-TervisShopifyPaymentsToEBSPayment -ShopName $ShopName # Need to account for split payments
                 [array]$Subqueries = $ConvertedOrderHeader | New-EBSOrderLineHeaderSubquery
                 $Subqueries += $ConvertedOrderLines | New-EBSOrderLineSubquery
                 $Subqueries += $ConvertedOrderPayment | New-EBSOrderLinePaymentSubquery
                 $Subqueries | Invoke-EBSSubqueryInsert
             }
-            $_ | Set-ShopifyOrderTag -ShopName $ShopName -AddTag "ImportedToEBS"
+            $_ | Set-ShopifyOrderTag -ShopName $ShopName -AddTag "ImportedToEBS" | Out-Null
+            $OrdersProcessed++
         } catch {
-            Write-EventLog -LogName Shopify -Source "Sales Interface" -EntryType Error -EventId 2 `
+            Write-EventLog -LogName Shopify -Source "Order Interface" -EntryType Error -EventId 2 `
                 -Message "Something went wrong. Reason:`n$_" 
         }
     }
+    Write-EventLog -LogName Shopify -Source "Order Interface" -EntryType Information -EventId 1 `
+            -Message "Finished Shopify order import. Processed $OrdersProcessed order(s)." 
 }
 
 function Test-TervisShopifyEBSOrderExists {
@@ -366,13 +370,13 @@ function Convert-TervisShopifyOrderToEBSOrderLines {
         # $OrderId = $Order.id | Get-ShopifyIdFromShopifyGid
         # $StoreNumber = $LocationDefinition.RMSStoreNumber
         # $ORIG_SYS_DOCUMENT_REF = "$StoreNumber-$OrderId"
-        $ORIG_SYS_DOCUMENT_REF = $Order.EBSDocumentReference
+        # $ORIG_SYS_DOCUMENT_REF = $Order.EBSDocumentReference
         $OrderLineNumber = 0
         $Order.lineItems.edges.node | ForEach-Object {
             $OrderLineNumber++
             [PSCustomObject]@{
                 ORDER_SOURCE_ID = "1022" # For use during testing payments
-                ORIG_SYS_DOCUMENT_REF = $ORIG_SYS_DOCUMENT_REF
+                ORIG_SYS_DOCUMENT_REF = $Order.EBSDocumentReference
                 ORIG_SYS_LINE_REF = "$OrderLineNumber"
                 ORIG_SYS_SHIPMENT_REF = ""
                 LINE_TYPE = "Tervis Bill Only with Inv Line"
@@ -429,12 +433,12 @@ function Convert-TervisShopifyOrderToEBSOrderLineHeader {
         # $OrderId = $Order.id | Get-ShopifyIdFromShopifyGid
         # $StoreNumber = $LocationDefinition.RMSStoreNumber
         # $ORIG_SYS_DOCUMENT_REF = "$StoreNumber-$OrderId"
-        $ORIG_SYS_DOCUMENT_REF = $Order.EBSDocumentReference
-        $StoreCustomerNumber = $LocationDefinition.CustomerNumber
+        # $ORIG_SYS_DOCUMENT_REF = $Order.EBSDocumentReference
+        # $StoreCustomerNumber = $LocationDefinition.CustomerNumber
 
         [PSCustomObject]@{
             ORDER_SOURCE_ID = "1022" # For use during testing payments
-            ORIG_SYS_DOCUMENT_REF = $ORIG_SYS_DOCUMENT_REF
+            ORIG_SYS_DOCUMENT_REF = $Order.EBSDocumentReference
             ORDERED_DATE = "TO_DATE('$($Order.createdAt)', 'YYYY-MM-DD`"T`"HH24:MI:SS`"Z`"')"
             ORDER_TYPE = "Store Order"
             PRICE_LIST = ""
@@ -448,7 +452,7 @@ function Convert-TervisShopifyOrderToEBSOrderLineHeader {
             SHIP_FROM_ORG = "ORG"
             SHIP_TO_ORG = ""
             INVOICE_TO_ORG = ""
-            CUSTOMER_NUMBER = $StoreCustomerNumber
+            CUSTOMER_NUMBER = $Order.StoreCustomerNumber
             BOOKED_FLAG = "Y"
             ATTRIBUTE8 = ""
             CREATION_DATE = "sysdate"
@@ -489,7 +493,11 @@ function Convert-TervisShopifyPaymentsToEBSPayment {
         $PaymentTypeCode = $Transaction | Get-TervisShopifyPaymentTypeCode
         $PaymentCollectionEvent = $Transaction | Get-TervisShopifyPaymentCollectionEvent
         $CreditCardNumber = $Transaction | New-TervisShopifyCCDummyNumber
-        $CreditCardApprovalDate = if ($CreditCardNumber) {$Transaction.processed_at | ConvertTo-TervisShopifyOracleSqlUtcDateString}
+        $CreditCardApprovalDate = if ($CreditCardNumber) {
+            $Transaction.processed_at | ConvertTo-TervisShopifyOracleSqlUtcDateString
+        } else {
+            "''"
+        }
 
 
         [PSCustomObject]@{
@@ -814,8 +822,8 @@ function New-EBSOrderLinePaymentSubquery {
             $($ConvertedPayment.PAYMENT_AMOUNT),
             $($ConvertedPayment.CREATION_DATE),
             $($ConvertedPayment.LAST_UPDATE_DATE),
-            $($ConvertedPayment.CREDIT_CARD_EXPIRATION_MONTH),
-            $($ConvertedPayment.CREDIT_CARD_EXPIRATION_YEAR),
+            '$($ConvertedPayment.CREDIT_CARD_EXPIRATION_MONTH)',
+            '$($ConvertedPayment.CREDIT_CARD_EXPIRATION_YEAR)',
             '$($ConvertedPayment.CREDIT_CARD_PAYMENT_STATUS)',
             '$($ConvertedPayment.PROCESS_FLAG)',
             '$($ConvertedPayment.SOURCE_NAME)',
@@ -840,12 +848,7 @@ function Invoke-EBSSubqueryInsert {
     }
     end {
         $FinalQuery += "`nSELECT 1 FROM DUAL"
-        try {
-            Invoke-EBSSQL -SQLCommand $FinalQuery
-            return $true
-        } catch {
-            return $false
-        }
+        Invoke-EBSSQL -SQLCommand $FinalQuery
     }
 }
 
