@@ -1091,7 +1091,7 @@ function Sync-TervisShopifyInventoryFromQueryObject {
                 $Synced = "Y"
             } else { # Else, error handling. Log objects?
                 $Synced = "N"
-                $ErrMsg = ""
+                $ErrMsg = "$($Response.data.inventoryBulkAdjustQuantityAtLocation.userErrors)`n$($Response.errors)"
             }
         } catch {
             $Synced = "N"
