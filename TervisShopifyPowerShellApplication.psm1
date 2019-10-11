@@ -899,11 +899,25 @@ function Invoke-TervisShopifyInterfaceInventoryUpdate {
                 #Get current inventory - Get-ShopifyInventoryAtLocation
                 # Measure-Command {
                     $InventoryUpdates | ForEach-Object {
-                        # Write-Warning "Getting Inventory levels at location"
-                        $InventoryItem = Get-ShopifyInventoryLevelAtLocation `
-                            -ShopName $ShopName `
-                            -SKU $_.ITEM_NUMBER `
-                            -LocationId $Parameter.id.split("/")[-1]
+                        try {
+                            $SKU = $_.ITEM_NUMBER
+                            # Write-Warning "Getting Inventory levels at location"
+                            $InventoryItem = Get-ShopifyInventoryLevelAtLocation `
+                                -ShopName $ShopName `
+                                -SKU $SKU `
+                                -LocationId $Parameter.id.split("/")[-1]
+    
+                            if ($null -eq $InventoryItem.inventoryLevel) {
+                                Invoke-ShopifyInventoryActivate `
+                                    -InventoryItemId $InventoryItem.id.split("/")[-1] `
+                                    -LocationId $Parameter.id.split("/")[-1] `
+                                    -ShopName $ShopName | 
+                                    Out-Null
+                            }
+                        } catch {
+                            Write-EventLog -LogName Shopify -Source "Inventory Interface" -EntryType Warning -EventId 2 `
+                                -Message "Could not get inventory item information for item #$SKU at $($Parameter.name). Reason:`n$_"
+                        }
                         # Write-Warning "Calculating difference"
                         $Difference = if ($InventoryItem) {
                             $_.ON_HAND_QTY - $InventoryItem.inventoryLevel.available
