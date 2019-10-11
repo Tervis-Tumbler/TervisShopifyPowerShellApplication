@@ -201,20 +201,22 @@ function Invoke-TervisShopifyAddOrUpdateProduct {
                         -ImageURL "http://images.tervis.com/is/image/$($ProductRecord.IMAGE_URL)" `
                         -Vendor "Tervis"
                 }
-            $ShopifyRESTProduct = @{id = $NewOrUpdatedProduct.id -replace "[^0-9]"}
-            $ShopifyInventoryItemId = $NewOrUpdatedProduct.variants.edges.node.inventoryItem.id -replace "[^0-9]"
             # Publish item to POS channel
+            $ShopifyRESTProduct = @{id = $NewOrUpdatedProduct.id -replace "[^0-9]"}
             Set-ShopifyRestProductChannel -ShopName $ShopName -Products $ShopifyRESTProduct -Channel global | Out-Null
-            # Make item available at all locations -replace "[^0-9]"
-            $InventoryItemLocations = Get-ShopifyInventoryItemLocations -ShopName $ShopName -InventoryItemId $ShopifyInventoryItemId
-            $MissingLocationIDs = $Locations | 
-                Where-Object Name -NotIn $InventoryItemLocations.Name |
-                Select-Object -ExpandProperty id | 
-                Get-ShopifyIdFromShopifyGid
+            
+            
+            # # Make item available at all locations - not needed, now part of inventory sync
+            # $ShopifyInventoryItemId = $NewOrUpdatedProduct.variants.edges.node.inventoryItem.id -replace "[^0-9]"
+            # $InventoryItemLocations = Get-ShopifyInventoryItemLocations -ShopName $ShopName -InventoryItemId $ShopifyInventoryItemId
+            # $MissingLocationIDs = $Locations | 
+            #     Where-Object Name -NotIn $InventoryItemLocations.Name |
+            #     Select-Object -ExpandProperty id | 
+            #     Get-ShopifyIdFromShopifyGid
 
-            $MissingLocationIDs | ForEach-Object {
-                Invoke-ShopifyInventoryActivate -InventoryItemId $ShopifyInventoryItemId -LocationId $_ -ShopName $ShopName | Out-Null
-            }
+            # $MissingLocationIDs | ForEach-Object {
+            #     Invoke-ShopifyInventoryActivate -InventoryItemId $ShopifyInventoryItemId -LocationId $_ -ShopName $ShopName | Out-Null
+            # }
 
             # Write back to EBS staging table
             Set-TervisShopifyItemStagingTableUpdateFlag -EbsItemNumber $NewOrUpdatedProduct.variants.edges.node.inventoryItem.sku
