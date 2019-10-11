@@ -223,7 +223,7 @@ function Invoke-TervisShopifyAddOrUpdateProduct {
             # Write-Warning "$($_.ITEM_NUMBER) could not be created on Shopify"
             Write-Warning $_
             Write-EventLog -LogName Shopify -Source "Item Interface" -EntryType Warning -EventId 3 `
-                -Message "Could not sync item $($ProductRecord.Item_Number) `nReason:`n$_"
+                -Message "Could not sync item $($ProductRecord.Item_Number) `nReason:`n$_`n$($_.InvocationInfo.PositionMessage)"
             return $false
         }
     }
@@ -245,7 +245,7 @@ function Invoke-TervisShopifyRemoveProduct {
         } catch {
             Write-Warning $_
             Write-EventLog -LogName Shopify -Source "Item Interface" -EntryType Warning -EventId 3 `
-                -Message "Could not sync item $($ProductRecord.Item_Number) `nReason:`n$_"
+                -Message "Could not sync item $($ProductRecord.Item_Number) `nReason:`n$_`n$($_.InvocationInfo.PositionMessage)"
             return $false
         }
 
@@ -310,7 +310,7 @@ function Invoke-TervisShopifyInterfaceOrderImport {
             -Message "Starting Shopify order import. Processing $($ShopifyOrders.Count) order(s)." 
     } catch {
         Write-EventLog -LogName Shopify -Source "Order Interface" -EntryType Error -EventId 2 `
-            -Message "Something went wrong. Reason:`n$_" 
+            -Message "Something went wrong. Reason:`n$_`n$($_.InvocationInfo.PositionMessage)" 
             $_
     }
     $i = 0
@@ -333,7 +333,7 @@ function Invoke-TervisShopifyInterfaceOrderImport {
             $OrdersProcessed++
         } catch {
             Write-EventLog -LogName Shopify -Source "Order Interface" -EntryType Error -EventId 2 `
-                -Message "Something went wrong. Reason:`n$_" 
+                -Message "Something went wrong. Reason:`n$_`n$($_.InvocationInfo.PositionMessage)" 
         }
     }
     Write-EventLog -LogName Shopify -Source "Order Interface" -EntryType Information -EventId 1 `
@@ -912,7 +912,10 @@ function Invoke-TervisShopifyInterfaceInventoryUpdate {
                                 -SKU $SKU `
                                 -LocationId $Parameter.id.split("/")[-1]
     
-                            if ($null -eq $InventoryItem.inventoryLevel) {
+                            if (
+                                $InventoryItem -and
+                                $null -eq $InventoryItem.inventoryLevel
+                            ) {
                                 Invoke-ShopifyInventoryActivate `
                                     -InventoryItemId $InventoryItem.id.split("/")[-1] `
                                     -LocationId $Parameter.id.split("/")[-1] `
@@ -921,7 +924,7 @@ function Invoke-TervisShopifyInterfaceInventoryUpdate {
                             }
                         } catch {
                             Write-EventLog -LogName Shopify -Source "Inventory Interface" -EntryType Warning -EventId 2 `
-                                -Message "Could not get inventory item information for item #$SKU at $($Parameter.name). Reason:`n$_"
+                                -Message "Could not get inventory item information for item #$SKU at $($Parameter.name). Reason:`n$_`n$($_.InvocationInfo.PositionMessage)"
                         }
                         # Write-Warning "Calculating difference"
                         $Difference = if ($InventoryItem) {
