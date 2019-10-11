@@ -326,7 +326,7 @@ function Invoke-TervisShopifyInterfaceOrderImport {
                 $ConvertedOrderPayment = $_ | Convert-TervisShopifyPaymentsToEBSPayment -ShopName $ShopName # Need to account for split payments
                 [array]$Subqueries = $ConvertedOrderHeader | New-EBSOrderLineHeaderSubquery
                 $Subqueries += $ConvertedOrderLines | New-EBSOrderLineSubquery
-                $Subqueries += $ConvertedOrderPayment | New-EBSOrderLinePaymentSubquery
+                # $Subqueries += $ConvertedOrderPayment | New-EBSOrderLinePaymentSubquery
                 $Subqueries | Invoke-EBSSubqueryInsert
             }
             $_ | Set-ShopifyOrderTag -ShopName $ShopName -AddTag "ImportedToEBS" | Out-Null
@@ -396,7 +396,7 @@ function Convert-TervisShopifyOrderToEBSOrderLines {
                 ATTRIBUTE14 = ""
                 CREATION_DATE = "sysdate"
                 LAST_UPDATE_DATE = "sysdate"
-                SUBINVENTORY = $LocationDefinition.Subinventory
+                SUBINVENTORY = $Order.Subinventory
                 EARLIEST_ACCEPTABLE_DATE = ""
                 LATEST_ACCEPTABLE_DATE = ""
                 GIFT_MESSAGE = ""
@@ -498,6 +498,7 @@ function Convert-TervisShopifyPaymentsToEBSPayment {
         } else {
             "''"
         }
+        $CheckNumber = if ($PaymentTypeCode -eq "CHECK") {"N/A"}
 
 
         [PSCustomObject]@{
@@ -509,9 +510,11 @@ function Convert-TervisShopifyPaymentsToEBSPayment {
             PAYMENT_COLLECTION_EVENT = $PaymentCollectionEvent
             CREDIT_CARD_NUMBER = $CreditCardNumber
             CREDIT_CARD_HOLDER_NAME = ""
-            CREDIT_CARD_CODE = 'UNKNOWN'
+            # CREDIT_CARD_CODE = 'UNKNOWN'
+            CREDIT_CARD_CODE = ''
             CREDIT_CARD_APPROVAL_CODE = $Transaction.authorization
             CREDIT_CARD_APPROVAL_DATE = $CreditCardApprovalDate
+            CHECK_NUMBER = $CheckNumber
             PAYMENT_AMOUNT = $Transaction.amount
             CREATION_DATE = "sysdate"
             LAST_UPDATE_DATE = "sysdate"
@@ -795,6 +798,7 @@ function New-EBSOrderLinePaymentSubquery {
             CREDIT_CARD_CODE,
             CREDIT_CARD_APPROVAL_CODE,
             CREDIT_CARD_APPROVAL_DATE,
+            CHECK_NUMBER,
             PAYMENT_AMOUNT,
             CREATION_DATE,
             LAST_UPDATE_DATE,
@@ -819,6 +823,7 @@ function New-EBSOrderLinePaymentSubquery {
             '$($ConvertedPayment.CREDIT_CARD_CODE)',
             '$($ConvertedPayment.CREDIT_CARD_APPROVAL_CODE)',
             $($ConvertedPayment.CREDIT_CARD_APPROVAL_DATE),
+            '$($ConvertedPayment.CHECK_NUMBER)',
             $($ConvertedPayment.PAYMENT_AMOUNT),
             $($ConvertedPayment.CREATION_DATE),
             $($ConvertedPayment.LAST_UPDATE_DATE),
