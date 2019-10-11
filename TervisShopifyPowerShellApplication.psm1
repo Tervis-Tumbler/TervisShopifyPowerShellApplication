@@ -153,7 +153,7 @@ function Invoke-TervisShopifyInterfaceItemUpdate {
             $i++
             Write-Progress -Activity "Syncing products to Shopify" -Status "$i of $NewRecordCount" `
                 -PercentComplete ($i * 100 / $NewRecordCount) -CurrentOperation "Processing EBS item #$($_.ITEM_NUMBER)" -SecondsRemaining (($NewRecordCount - $i) * 4)
-            $isSuccessful += if ($_.ITEM_STATUS -in "Active","DTCDeplete") {
+            $isSuccessful += if ($_.ITEM_STATUS -in "Active","DTCDeplete","Hold","Pending") {
                 $_ | Invoke-TervisShopifyAddOrUpdateProduct -ShopName $ShopName -Locations $Locations
             } else {
                 $_ | Invoke-TervisShopifyRemoveProduct -ShopName $ShopName
