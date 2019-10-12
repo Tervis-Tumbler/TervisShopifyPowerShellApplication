@@ -306,20 +306,22 @@ function Invoke-TervisShopifyInterfaceOrderImport {
     $ShopName = Get-TervisShopifyEnvironmentShopName -Environment $Environment
     
     try {
-        Write-Progress -Activity "Shopify Order Import Interface" -CurrentOperation "Getting orders"
+        Write-Progress -Activity "Shopify Order Import Interface" -CurrentOperation "Getting orders from Shopify"
         [array]$ShopifyOrders = Get-TervisShopifyOrdersForImport -ShopName $ShopName
+        Write-Progress -Activity "Shopify Order Import Interface" -CurrentOperation "Getting refunds from Shopify"
+        [array]$ShopifyRefunds = Get-TervisShopifyOrdersWithRefundPending -ShopName $ShopName
         Write-EventLog -LogName Shopify -Source "Order Interface" -EntryType Information -EventId 1 `
-            -Message "Starting Shopify order import. Processing $($ShopifyOrders.Count) order(s)." 
+            -Message "Starting Shopify order import. Processing $($ShopifyOrders.Count) order(s), $($ShopifyRefunds.Count) refund(s)." 
     } catch {
         Write-EventLog -LogName Shopify -Source "Order Interface" -EntryType Error -EventId 2 `
-            -Message "Something went wrong. Reason:`n$_`n$($_.InvocationInfo.PositionMessage)" 
+        -Message "Something went wrong. Reason:`n$_`n$($_.InvocationInfo.PositionMessage)" 
             $_
     }
     $i = 0
     $OrdersProcessed = 0
     $ShopifyOrders | ForEach-Object {
         $i++
-        Write-Progress -Activity "Shopify Order Import Interface" -CurrentOperation "Converting orders to EBS format" `
+        Write-Progress -Activity "Shopify Order Import Interface" -CurrentOperation "Importing orders to EBS" `
             -PercentComplete ($i * 100 / $ShopifyOrders.Count)
         try {
             if (-not (Test-TervisShopifyEBSOrderExists -Order $_)) {
@@ -333,6 +335,19 @@ function Invoke-TervisShopifyInterfaceOrderImport {
             }
             $_ | Set-ShopifyOrderTag -ShopName $ShopName -AddTag "ImportedToEBS" | Out-Null
             $OrdersProcessed++
+        } catch {
+            Write-EventLog -LogName Shopify -Source "Order Interface" -EntryType Error -EventId 2 `
+                -Message "Something went wrong. Reason:`n$_`n$($_.InvocationInfo.PositionMessage)" 
+        }
+    }
+    $i = 0
+    $RefundsProcessed = 0
+    $ShopifyRefunds | ForEach-Object {
+        $i++
+        Write-Progress -Activity "Shopify Order Import Interface" -CurrentOperation "Importing refunds to EBS" `
+            -PercentComplete ($i * 100 / $ShopifyRefunds.Count)
+        try {
+            
         } catch {
             Write-EventLog -LogName Shopify -Source "Order Interface" -EntryType Error -EventId 2 `
                 -Message "Something went wrong. Reason:`n$_`n$($_.InvocationInfo.PositionMessage)" 
@@ -985,7 +1000,6 @@ Total inventory items: $($InventoryUpdates.Count)
             }
         }
     }
-
 }
 
 function Get-TervisShopifyInventoryStagingTableCount {
