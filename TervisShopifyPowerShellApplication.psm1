@@ -7,6 +7,7 @@ function Invoke-TervisShopifyPowerShellApplicationProvision {
     $Nodes | Install-TervisShopifyPowerShellApplicationLog
     $Nodes | Install-TervisShopifyPowerShellApplication_ItemInterface
     $Nodes | Install-TervisShopifyPowerShellApplication_InventoryInterface
+    $Nodes | Install-TervisShopifyPowerShellApplication_OrderInterface
 }
 
 function Install-TervisShopifyPowerShellApplicationLog {
