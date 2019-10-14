@@ -360,7 +360,7 @@ function Invoke-TervisShopifyInterfaceOrderImport {
     }
     $i = 0
     $OrdersProcessed = 0
-    foreach ($Order in $ShopifyRefunds) {
+    foreach ($Order in $ShopifyOrders) {
         $i++
         Write-Progress -Activity "Shopify Order Import Interface" -CurrentOperation "Importing orders to EBS" `
             -PercentComplete ($i * 100 / $ShopifyOrders.Count)
