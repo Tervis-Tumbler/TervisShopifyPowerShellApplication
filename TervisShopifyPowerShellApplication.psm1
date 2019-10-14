@@ -23,10 +23,12 @@ function Install-TervisShopifyPowerShellApplicationLog {
             "Inventory Interface"
     }
     process {
-        try {
-            New-EventLog -ComputerName $ComputerName -LogName $LogName -Source $LogSources -ErrorAction Stop
-        } catch [System.InvalidOperationException] {
-            Write-Warning "Log and sources already exist"
+        foreach ($Source in $LogSources) {
+            try {
+                New-EventLog -ComputerName $ComputerName -LogName $LogName -Source $LogSources -ErrorAction Stop
+            } catch [System.InvalidOperationException] {
+                Write-Warning "$Source log already exists."
+            }
         }
     }
 }
@@ -358,21 +360,21 @@ function Invoke-TervisShopifyInterfaceOrderImport {
     }
     $i = 0
     $OrdersProcessed = 0
-    $ShopifyOrders | ForEach-Object {
+    foreach ($Order in $ShopifyRefunds) {
         $i++
         Write-Progress -Activity "Shopify Order Import Interface" -CurrentOperation "Importing orders to EBS" `
             -PercentComplete ($i * 100 / $ShopifyOrders.Count)
         try {
-            if (-not (Test-TervisShopifyEBSOrderExists -Order $_)) {
-                $ConvertedOrderHeader = $_ | Convert-TervisShopifyOrderToEBSOrderLineHeader
-                $ConvertedOrderLines = $_ | Convert-TervisShopifyOrderToEBSOrderLines
-                $ConvertedOrderPayment = $_ | Convert-TervisShopifyPaymentsToEBSPayment -ShopName $ShopName # Need to account for split payments
+            if (-not (Test-TervisShopifyEBSOrderExists -Order $Order)) {
+                $ConvertedOrderHeader = $Order | Convert-TervisShopifyOrderToEBSOrderLineHeader
+                $ConvertedOrderLines = $Order | Convert-TervisShopifyOrderToEBSOrderLines
+                $ConvertedOrderPayment = $Order | Convert-TervisShopifyPaymentsToEBSPayment -ShopName $ShopName # Need to account for split payments
                 [array]$Subqueries = $ConvertedOrderHeader | New-EBSOrderLineHeaderSubquery
                 $Subqueries += $ConvertedOrderLines | New-EBSOrderLineSubquery
                 # $Subqueries += $ConvertedOrderPayment | New-EBSOrderLinePaymentSubquery
                 $Subqueries | Invoke-EBSSubqueryInsert
             }
-            $_ | Set-ShopifyOrderTag -ShopName $ShopName -AddTag "ImportedToEBS" | Out-Null
+            $Order | Set-ShopifyOrderTag -ShopName $ShopName -AddTag "ImportedToEBS" | Out-Null
             $OrdersProcessed++
         } catch {
             Write-EventLog -LogName Shopify -Source "Order Interface" -EntryType Error -EventId 2 `
