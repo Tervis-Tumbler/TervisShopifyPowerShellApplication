@@ -116,6 +116,44 @@ Set-TervisShopifyEnvironment -Environment $EnvironmentName
     }
 }
 
+function Install-TervisShopifyPowerShellApplication_OrderInterface {
+    param (
+        [Parameter(Mandatory,ValueFromPipelineByPropertyName)]$ComputerName,
+        [Parameter(Mandatory,ValueFromPipelineByPropertyName)]
+        [ValidateSet("Delta","Epsilon","Production")]$EnvironmentName
+    )
+    begin {
+        $ScheduledTasksCredential = Get-TervisPasswordstatePassword -Guid "eed2bd81-fd47-4342-bd59-b396da75c7ed" -AsCredential
+    }
+    process {
+        $PowerShellApplicationParameters = @{
+            ComputerName = $ComputerName
+            EnvironmentName = $EnvironmentName
+            ModuleName = "TervisShopifyPowerShellApplication"
+            TervisModuleDependencies = `
+                "WebServicesPowerShellProxyBuilder",
+                "TervisPowerShellJobs",
+                "PasswordstatePowershell",
+                "TervisPasswordstatePowershell",
+                "OracleE-BusinessSuitePowerShell",
+                "TervisOracleE-BusinessSuitePowerShell",
+                "InvokeSQL",
+                "TervisMicrosoft.PowerShell.Utility",
+                "TervisMicrosoft.PowerShell.Security",
+                "ShopifyPowerShell",
+                "TervisShopify",
+                "TervisShopifyPowerShellApplication"
+            NugetDependencies = "Oracle.ManagedDataAccess.Core"
+            ScheduledTaskName = "ShopifyOrderInterface"
+            RepetitionIntervalName = "EveryDayEvery15Minutes"
+            CommandString = "Invoke-TervisShopifyInterfaceOrderImport -Environment $EnvironmentName"
+            ScheduledTasksCredential = $ScheduledTasksCredential
+        }
+        
+        Install-PowerShellApplication @PowerShellApplicationParameters
+    }
+}
+
 function Get-TervisShopifyEnvironmentShopName {
     param (
         [Parameter(Mandatory)][ValidateSet("Delta","Epsilon","Production")]$Environment
@@ -342,19 +380,28 @@ function Invoke-TervisShopifyInterfaceOrderImport {
     }
     $i = 0
     $RefundsProcessed = 0
-    $ShopifyRefunds | ForEach-Object {
+    foreach ($Refund in $ShopifyRefunds) {
         $i++
         Write-Progress -Activity "Shopify Order Import Interface" -CurrentOperation "Importing refunds to EBS" `
             -PercentComplete ($i * 100 / $ShopifyRefunds.Count)
         try {
-            
+            if (-not (Test-TervisShopifyEBSOrderExists -Order $Refund)) {
+                $ConvertedRefundHeader = $Refund | Convert-TervisShopifyOrderToEBSOrderLineHeader
+                $ConvertedRefundLines = $Refund | Convert-TervisShopifyRefundToEBSOrderLines
+                [array]$Subqueries = $ConvertedRefundHeader | New-EBSOrderLineHeaderSubquery
+                $Subqueries += $ConvertedRefundLines | New-EBSOrderLineSubquery
+                $Subqueries | Invoke-EBSSubqueryInsert
+            }
+            $Refund.Order | Set-ShopifyOrderTag -ShopName $ShopName -RemoveTag $Refund.RefundTag -AddTag "RefundProcessed_$($Refund.RefundID)"
+            $RefundsProcessed++
         } catch {
             Write-EventLog -LogName Shopify -Source "Order Interface" -EntryType Error -EventId 2 `
                 -Message "Something went wrong. Reason:`n$_`n$($_.InvocationInfo.PositionMessage)" 
         }
     }
+    Invoke-TervisShopifyRefundPendingTagCleanup -ShopName $ShopName
     Write-EventLog -LogName Shopify -Source "Order Interface" -EntryType Information -EventId 1 `
-            -Message "Finished Shopify order import. Processed $OrdersProcessed order(s)." 
+            -Message "Finished Shopify order import. Processed $OrdersProcessed order(s). Processed $RefundsProcessed refund(s)." 
 }
 
 function Test-TervisShopifyEBSOrderExists {
@@ -436,6 +483,64 @@ function Convert-TervisShopifyOrderToEBSOrderLines {
                 LAST_UPDATED_BY_NAME = "SHOPIFY"
                 ACCESSORY = ""
                 TAX_VALUE = $_.taxLines.priceSet.shopMoney.amount | Measure-Object -Sum | Select-Object -ExpandProperty Sum
+            }
+        }
+    }
+}
+
+function Convert-TervisShopifyRefundToEBSOrderLines {
+    param (
+        [Parameter(Mandatory,ValueFromPipeline)]$Order
+    )
+    process {
+        $OrderLineNumber = 0
+        $Order.refundLineItems.edges.node | ForEach-Object {
+            $OrderLineNumber++
+            [PSCustomObject]@{
+                ORDER_SOURCE_ID = "1022" # For use during testing payments
+                ORIG_SYS_DOCUMENT_REF = $Order.EBSDocumentReference
+                ORIG_SYS_LINE_REF = "$OrderLineNumber"
+                ORIG_SYS_SHIPMENT_REF = ""
+                LINE_TYPE = "Tervis Credit Only Line"
+                INVENTORY_ITEM = "$($_.lineItem.sku)"
+                ORDERED_QUANTITY = $_.quantity * -1
+                ORDER_QUANTITY_UOM = "EA"
+                SHIP_FROM_ORG = "STO"
+                PRICE_LIST = ""
+                UNIT_LIST_PRICE = $($_.priceSet.shopMoney.amount)
+                UNIT_SELLING_PRICE = $($_.priceSet.shopMoney.amount)
+                CALCULATE_PRICE_FLAG = "P"
+                RETURN_REASON_CODE = "STORE RETURN"
+                CUSTOMER_ITEM_ID_TYPE = ""
+                ATTRIBUTE1 = ""
+                ATTRIBUTE7 = ""
+                ATTRIBUTE13 = ""
+                ATTRIBUTE14 = ""
+                CREATION_DATE = "sysdate"
+                LAST_UPDATE_DATE = "sysdate"
+                SUBINVENTORY = $Order.Subinventory
+                EARLIEST_ACCEPTABLE_DATE = ""
+                LATEST_ACCEPTABLE_DATE = ""
+                GIFT_MESSAGE = ""
+                SIDE1_COLOR = ""
+                SIDE2_COLOR = ""
+                SIDE1_FONT = ""
+                SIDE2_FONT = ""
+                SIDE1_TEXT1 = ""
+                SIDE2_TEXT1 = ""
+                SIDE1_TEXT2 = ""
+                SIDE2_TEXT2 = ""
+                SIDE1_TEXT3 = ""
+                SIDE2_TEXT3 = ""
+                SIDE1_INITIALS = ""
+                SIDE2_INITIALS = ""
+                PROCESS_FLAG = "N"
+                SOURCE_NAME = "RMS"
+                OPERATING_UNIT_NAME = "Tervis Operating Unit"
+                CREATED_BY_NAME = "SHOPIFY"
+                LAST_UPDATED_BY_NAME = "SHOPIFY"
+                ACCESSORY = ""
+                TAX_VALUE = $_.totalTaxSet.shopMoney.amount
             }
         }
     }
