@@ -351,8 +351,10 @@ function Invoke-TervisShopifyInterfaceOrderImport {
         [array]$ShopifyOrders = Get-TervisShopifyOrdersForImport -ShopName $ShopName
         Write-Progress -Activity "Shopify Order Import Interface" -CurrentOperation "Getting refunds from Shopify"
         [array]$ShopifyRefunds = Get-TervisShopifyOrdersWithRefundPending -ShopName $ShopName
-        Write-EventLog -LogName Shopify -Source "Order Interface" -EntryType Information -EventId 1 `
-            -Message "Starting Shopify order import. Processing $($ShopifyOrders.Count) order(s), $($ShopifyRefunds.Count) refund(s)." 
+        if ($ShopifyOrders.Count -gt 0 -or $ShopifyRefunds.Count -gt 0) {
+            Write-EventLog -LogName Shopify -Source "Order Interface" -EntryType Information -EventId 1 `
+                -Message "Starting Shopify order import. Processing $($ShopifyOrders.Count) order(s), $($ShopifyRefunds.Count) refund(s)." 
+        }
     } catch {
         Write-EventLog -LogName Shopify -Source "Order Interface" -EntryType Error -EventId 2 `
         -Message "Something went wrong. Reason:`n$_`n$($_.InvocationInfo.PositionMessage)" 
@@ -403,8 +405,10 @@ function Invoke-TervisShopifyInterfaceOrderImport {
         }
     }
     Invoke-TervisShopifyRefundPendingTagCleanup -ShopName $ShopName
-    Write-EventLog -LogName Shopify -Source "Order Interface" -EntryType Information -EventId 1 `
-            -Message "Finished Shopify order import. Processed $OrdersProcessed order(s). Processed $RefundsProcessed refund(s)." 
+    if ($ShopifyOrders.Count -gt 0 -or $ShopifyRefunds.Count -gt 0) {
+        Write-EventLog -LogName Shopify -Source "Order Interface" -EntryType Information -EventId 1 `
+                -Message "Finished Shopify order import. Processed $OrdersProcessed order(s). Processed $RefundsProcessed refund(s)."
+    }
 }
 
 function Test-TervisShopifyEBSOrderExists {
