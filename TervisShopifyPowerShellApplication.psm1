@@ -570,7 +570,7 @@ function Convert-TervisShopifyOrderToEBSOrderLineHeader {
         [PSCustomObject]@{
             ORDER_SOURCE_ID = "1022" # For use during testing payments
             ORIG_SYS_DOCUMENT_REF = $Order.EBSDocumentReference
-            ORDERED_DATE = "TO_DATE('$($Order.createdAt)', 'YYYY-MM-DD`"T`"HH24:MI:SS`"Z`"')"
+            ORDERED_DATE = $Order.createdAt | ConvertTo-TervisShopifyOracleSqlDateString
             ORDER_TYPE = "Store Order"
             PRICE_LIST = ""
             SALESREP = ""
@@ -625,11 +625,11 @@ function Convert-TervisShopifyPaymentsToEBSPayment {
         $PaymentCollectionEvent = $Transaction | Get-TervisShopifyPaymentCollectionEvent
         $CreditCardNumber = $Transaction | New-TervisShopifyCCDummyNumber
         $CreditCardApprovalDate = if ($CreditCardNumber) {
-            $Transaction.processed_at | ConvertTo-TervisShopifyOracleSqlUtcDateString
+            $Transaction.processed_at | ConvertTo-TervisShopifyOracleSqlDateString
         } else {
             "''"
         }
-        $CheckNumber = if ($PaymentTypeCode -eq "CHECK") {"N/A"}
+        $CheckNumber = if ($PaymentTypeCode -eq "CHECK") {""}
 
 
         [PSCustomObject]@{
@@ -703,13 +703,14 @@ function New-TervisShopifyCCDummyNumber {
     }
 }
 
-function ConvertTo-TervisShopifyOracleSqlUtcDateString {
+function ConvertTo-TervisShopifyOracleSqlDateString {
     param (
         [Parameter(Mandatory,ValueFromPipeline)]$DateTime
     )
-    $UtcDateTimeString = (Get-Date $DateTime).ToUniversalTime().GetDateTimeFormats("u")
-    $OracleSqlToDateFunction = "TO_DATE('$UtcDateTimeString', 'YYYY-MM-DD HH24:MI:SS`"Z`"')"
-    return $OracleSqlToDateFunction
+    process {
+        $DateTimeString = (Get-Date $DateTime -Format "yyyyMMddHHmmss")
+        return "TO_DATE('$DateTimeString', 'YYYYMMDDHH24MISS')"
+    }
 }
 
 function New-EBSOrderLineSubquery {
@@ -1143,6 +1144,7 @@ function Get-TervisShopifyInventoryStagingTableUpdates {
         WHERE 1 = 1
         AND interfaced_flag = 'N'
         $(if ($SubinventoryCode) {"AND subinventory_code = '$SubinventoryCode'"})
+        ORDER BY on_hand_qty DESC
 "@
     Invoke-EBSSQL -SQLCommand $Query 
 }
