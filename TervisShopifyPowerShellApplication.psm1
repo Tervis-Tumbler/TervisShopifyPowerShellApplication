@@ -373,7 +373,7 @@ function Invoke-TervisShopifyInterfaceOrderImport {
                 $ConvertedOrderPayment = $Order | Convert-TervisShopifyPaymentsToEBSPayment -ShopName $ShopName # Need to account for split payments
                 [array]$Subqueries = $ConvertedOrderHeader | New-EBSOrderLineHeaderSubquery
                 $Subqueries += $ConvertedOrderLines | New-EBSOrderLineSubquery
-                # $Subqueries += $ConvertedOrderPayment | New-EBSOrderLinePaymentSubquery
+                # $Subqueries += $ConvertedOrderPayment | New-EBSOrderLinePaymentSubquery # Comment in PRD until payments impleemented
                 $Subqueries | Invoke-EBSSubqueryInsert
             }
             $Order | Set-ShopifyOrderTag -ShopName $ShopName -AddTag "ImportedToEBS" | Out-Null
@@ -489,7 +489,8 @@ function Convert-TervisShopifyOrderToEBSOrderLines {
                 CREATED_BY_NAME = "SHOPIFY"
                 LAST_UPDATED_BY_NAME = "SHOPIFY"
                 ACCESSORY = ""
-                TAX_VALUE = $_.taxLines.priceSet.shopMoney.amount | Measure-Object -Sum | Select-Object -ExpandProperty Sum
+                # TAX_VALUE = $_.taxLines.priceSet.shopMoney.amount | Measure-Object -Sum | Select-Object -ExpandProperty Sum
+                TAX_VALUE = "" # For use in PRD until payments implemented
             }
         }
     }
@@ -547,7 +548,8 @@ function Convert-TervisShopifyRefundToEBSOrderLines {
                 CREATED_BY_NAME = "SHOPIFY"
                 LAST_UPDATED_BY_NAME = "SHOPIFY"
                 ACCESSORY = ""
-                TAX_VALUE = $_.totalTaxSet.shopMoney.amount
+                # TAX_VALUE = $_.totalTaxSet.shopMoney.amount
+                TAX_VALUE = "" # For use in PRD until payments implemented
             }
         }
     }
