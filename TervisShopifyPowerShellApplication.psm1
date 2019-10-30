@@ -630,6 +630,7 @@ function Convert-TervisShopifyPaymentsToEBSPayment {
             "''"
         }
         $CheckNumber = if ($PaymentTypeCode -eq "CHECK") {""}
+        $ReceiptMethodId = if ($PaymentTypeCode -eq "CHECK") {$Order.ReceiptMethodId}
 
 
         [PSCustomObject]@{
@@ -658,7 +659,7 @@ function Convert-TervisShopifyPaymentsToEBSPayment {
             OPERATING_UNIT_NAME = "Tervis Operating Unit"
             CREATED_BY_NAME = "SHOPIFY"
             LAST_UPDATED_BY_NAME = "SHOPIFY"
-            RECEIPT_METHOD_ID = $Order.ReceiptMethodId
+            RECEIPT_METHOD_ID = $ReceiptMethodId
         }
     }
 }
@@ -919,7 +920,7 @@ function New-EBSOrderLinePaymentSubquery {
 
     process {
         $Query = @"
-        INTO xxoe_payments_iface_all
+        INTO xxoe_payments_iface_all 
         (
             ORDER_SOURCE_ID,
             ORIG_SYS_DOCUMENT_REF,
