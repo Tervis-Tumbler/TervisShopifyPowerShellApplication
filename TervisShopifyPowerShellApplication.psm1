@@ -457,7 +457,7 @@ function Convert-TervisShopifyOrderToEBSOrderLines {
                 SHIP_FROM_ORG = "STO"
                 PRICE_LIST = ""
                 UNIT_LIST_PRICE = $($_.originalUnitPriceSet.shopMoney.amount)
-                UNIT_SELLING_PRICE = $($_.originalUnitPriceSet.shopMoney.amount)
+                UNIT_SELLING_PRICE = $($_.discountedUnitPriceSet.shopMoney.amount)
                 CALCULATE_PRICE_FLAG = "P"
                 RETURN_REASON_CODE = ""
                 CUSTOMER_ITEM_ID_TYPE = ""
@@ -658,6 +658,7 @@ function Convert-TervisShopifyPaymentsToEBSPayment {
             OPERATING_UNIT_NAME = "Tervis Operating Unit"
             CREATED_BY_NAME = "SHOPIFY"
             LAST_UPDATED_BY_NAME = "SHOPIFY"
+            RECEIPT_METHOD_ID = $Order.ReceiptMethodId
         }
     }
 }
@@ -941,7 +942,8 @@ function New-EBSOrderLinePaymentSubquery {
             SOURCE_NAME,
             OPERATING_UNIT_NAME,
             CREATED_BY_NAME,
-            LAST_UPDATED_BY_NAME
+            LAST_UPDATED_BY_NAME,
+            RECEIPT_METHOD_ID
         )
         VALUES
         (
@@ -966,7 +968,8 @@ function New-EBSOrderLinePaymentSubquery {
             '$($ConvertedPayment.SOURCE_NAME)',
             '$($ConvertedPayment.OPERATING_UNIT_NAME)',
             '$($ConvertedPayment.CREATED_BY_NAME)',
-            '$($ConvertedPayment.LAST_UPDATED_BY_NAME)'
+            '$($ConvertedPayment.LAST_UPDATED_BY_NAME)',
+            '$($ConvertedPayment.RECEIPT_METHOD_ID)'
         )
 "@
         return $Query
