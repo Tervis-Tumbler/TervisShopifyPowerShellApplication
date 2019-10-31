@@ -630,7 +630,7 @@ function Convert-TervisShopifyPaymentsToEBSPayment {
             "''"
         }
         $CheckNumber = if ($PaymentTypeCode -eq "CHECK") {""}
-        $ReceiptMethodId = if ($PaymentTypeCode -eq "CHECK") {$Order.ReceiptMethodId}
+        $ReceiptMethodId = Get-TervisShopifyReceiptMethod -ReceiptMethodId $Order.ReceiptMethodId -PaymentTypeCode $PaymentTypeCode # if ($PaymentTypeCode -eq "CHECK") {$Order.ReceiptMethodId}
 
 
         [PSCustomObject]@{
@@ -702,6 +702,20 @@ function New-TervisShopifyCCDummyNumber {
         } else {
             return ""
         }
+    }
+}
+
+function Get-TervisShopifyReceiptMethod {
+    param (
+        [Parameter(Mandatory)]$ReceiptMethodId,
+        [Parameter(Mandatory)]$PaymentTypeCode
+    )
+    switch ($PaymentTypeCode) {
+        "CHECK" { $ReceiptMethodId; break }
+        "CASH" { "8001"; break }
+        "CREDIT_CARD" { "9001"; break }
+        default {""}
+
     }
 }
 
