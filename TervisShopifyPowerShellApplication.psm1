@@ -367,6 +367,11 @@ function Invoke-TervisShopifyInterfaceOrderImport {
         Write-Progress -Activity "Shopify Order Import Interface" -CurrentOperation "Importing orders to EBS" `
             -PercentComplete ($i * 100 / $ShopifyOrders.Count)
         try {
+            if (
+                -not $Order.StoreCustomerNumber -or
+                -not $Order.Subinventory -or
+                -not $Order.ReceiptMethodId
+            ) {throw "Location information incomplete. Please update LocationDefinition.csv."}
             if (-not (Test-TervisShopifyEBSOrderExists -Order $Order)) {
                 $ConvertedOrderHeader = $Order | Convert-TervisShopifyOrderToEBSOrderLineHeader
                 $ConvertedOrderLines = $Order | Convert-TervisShopifyOrderToEBSOrderLines
@@ -380,7 +385,7 @@ function Invoke-TervisShopifyInterfaceOrderImport {
             $OrdersProcessed++
         } catch {
             Write-EventLog -LogName Shopify -Source "Order Interface" -EntryType Error -EventId 2 `
-                -Message "Something went wrong. Reason:`n$_`n$($_.InvocationInfo.PositionMessage)" 
+                -Message "Something went wrong importing Shopify order #$($Order.legacyResourceId). Reason:`n$_`n$($_.InvocationInfo.PositionMessage)" 
         }
     }
     $i = 0
@@ -390,6 +395,10 @@ function Invoke-TervisShopifyInterfaceOrderImport {
         Write-Progress -Activity "Shopify Order Import Interface" -CurrentOperation "Importing refunds to EBS" `
             -PercentComplete ($i * 100 / $ShopifyRefunds.Count)
         try {
+            if (
+                -not $Refund.StoreCustomerNumber -or
+                -not $Refund.Subinventory
+            ) {throw "Location information incomplete. Please update LocationDefinition.csv."}
             if (-not (Test-TervisShopifyEBSOrderExists -Order $Refund)) {
                 $ConvertedRefundHeader = $Refund | Convert-TervisShopifyOrderToEBSOrderLineHeader
                 $ConvertedRefundLines = $Refund | Convert-TervisShopifyRefundToEBSOrderLines
@@ -401,7 +410,7 @@ function Invoke-TervisShopifyInterfaceOrderImport {
             $RefundsProcessed++
         } catch {
             Write-EventLog -LogName Shopify -Source "Order Interface" -EntryType Error -EventId 2 `
-                -Message "Something went wrong. Reason:`n$_`n$($_.InvocationInfo.PositionMessage)" 
+                -Message "Something went wrong importing refunds for order #$($Refund.Order.legacyResourceId). Reason:`n$_`n$($_.InvocationInfo.PositionMessage)" 
         }
     }
     Invoke-TervisShopifyRefundPendingTagCleanup -ShopName $ShopName
