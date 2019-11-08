@@ -694,24 +694,18 @@ function Convert-TervisShopifyPaymentsToEBSPayment {
         [Parameter(Mandatory)]$ShopName
     )
     process {
-        $Transaction = $Order | Get-ShopifyRestOrderTransactionDetail -ShopName $ShopName
-        # $LocationDefinition = Get-TervisShopifyLocationDefinition -City $Order.physicalLocation.address.city
-        # $OrderId = $Order.id | Get-ShopifyIdFromShopifyGid
-        # $StoreNumber = $LocationDefinition.RMSStoreNumber
-        # $StoreCustomerNumber = $LocationDefinition.CustomerNumber
-        # $ORIG_SYS_DOCUMENT_REF = "$StoreNumber-$OrderId"
+        [array]$Transactions = $Order | Get-ShopifyRestOrderTransactionDetail -ShopName $ShopName
+        
+        foreach ($Transaction in $Transactions) {
         $ORIG_SYS_DOCUMENT_REF = $Order.EBSDocumentReference
         $PaymentTypeCode = $Transaction | Get-TervisShopifyPaymentTypeCode
         $PaymentCollectionEvent = $Transaction | Get-TervisShopifyPaymentCollectionEvent
         $CreditCardNumber = $Transaction | New-TervisShopifyCCDummyNumber
-        $CreditCardApprovalDate = if ($CreditCardNumber) {
-            $Transaction.processed_at | ConvertTo-TervisShopifyOracleSqlDateString
-        } else {
-            "''"
-        }
+            $CreditCardName = $Transaction | New-TervisShopifyCCName
+            $CreditCardCode = if ($Transaction.gateway -eq "shopify_payments") {"UNKNOWN"}
+            $CreditCardApprovalDate = if ($CreditCardNumber) {$Transaction.processed_at | ConvertTo-TervisShopifyOracleSqlDateString}
         $CheckNumber = if ($PaymentTypeCode -eq "CHECK") {""}
         $ReceiptMethodId = Get-TervisShopifyReceiptMethod -ReceiptMethodId $Order.ReceiptMethodId -PaymentTypeCode $PaymentTypeCode # if ($PaymentTypeCode -eq "CHECK") {$Order.ReceiptMethodId}
-
 
         [PSCustomObject]@{
             # ORDER_SOURCE_ID = "1101"
@@ -721,9 +715,9 @@ function Convert-TervisShopifyPaymentsToEBSPayment {
             PAYMENT_TYPE_CODE = $PaymentTypeCode
             PAYMENT_COLLECTION_EVENT = $PaymentCollectionEvent
             CREDIT_CARD_NUMBER = $CreditCardNumber
-            CREDIT_CARD_HOLDER_NAME = ""
-            # CREDIT_CARD_CODE = 'UNKNOWN'
-            CREDIT_CARD_CODE = ''
+                CREDIT_CARD_HOLDER_NAME = $CreditCardName
+                CREDIT_CARD_CODE = $CreditCardCode
+                # CREDIT_CARD_CODE = ''
             CREDIT_CARD_APPROVAL_CODE = $Transaction.authorization
             CREDIT_CARD_APPROVAL_DATE = $CreditCardApprovalDate
             CHECK_NUMBER = $CheckNumber
@@ -742,6 +736,7 @@ function Convert-TervisShopifyPaymentsToEBSPayment {
             RECEIPT_METHOD_ID = $ReceiptMethodId
         }
     }
+}
 }
 
 function Get-TervisShopifyPaymentTypeCode {
@@ -785,6 +780,18 @@ function New-TervisShopifyCCDummyNumber {
     }
 }
 
+function New-TervisShopifyCCName {
+    param (
+        [Parameter(Mandatory,ValueFromPipeline)]$Transaction
+    )
+    process {
+        $Name = $Transaction.receipt.source.name
+        $Brand = $Transaction.receipt.source.brand
+        $Last4 = $Transaction.receipt.source.last4
+        return ("$Name $Brand $Last4").Trim()
+    }
+}
+
 function Get-TervisShopifyReceiptMethod {
     param (
         [Parameter(Mandatory)]$ReceiptMethodId,
@@ -793,7 +800,7 @@ function Get-TervisShopifyReceiptMethod {
     switch ($PaymentTypeCode) {
         "CHECK" { $ReceiptMethodId; break }
         "CASH" { "8001"; break }
-        "CREDIT_CARD" { "9001"; break }
+        "CREDIT_CARD" { "11001"; break }
         default {""}
 
     }
@@ -911,6 +918,7 @@ function New-EBSOrderLineSubquery {
                 '$($ConvertedOrder.ACCESSORY)',
                 '$($ConvertedOrder.TAX_VALUE)'
             )
+
 "@
         return $Query
     }
@@ -1002,6 +1010,7 @@ function New-EBSOrderLineHeaderSubquery {
             '$($ConvertedOrder.CREATED_BY_NAME)',
             '$($ConvertedOrder.LAST_UPDATED_BY_NAME)'
         )
+
 "@
         return $Query
     }
@@ -1066,6 +1075,7 @@ function New-EBSOrderLinePaymentSubquery {
             '$($ConvertedPayment.LAST_UPDATED_BY_NAME)',
             '$($ConvertedPayment.RECEIPT_METHOD_ID)'
         )
+
 "@
         return $Query
     }
