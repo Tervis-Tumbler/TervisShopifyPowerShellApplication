@@ -444,13 +444,6 @@ function Convert-TervisShopifyOrderToEBSOrderLines {
         [Parameter(Mandatory,ValueFromPipeline)]$Order
     )
     process {
-        # $LocationDefinition = Get-TervisShopifyLocationDefinition -City $Order.physicalLocation.address.city
-        # May need to adjust this for local time based on location 
-        # $DateString = Get-Date -Date ([datetime]::Parse($Order.createdat).toLocalTime()) -Format yyyyMMdd_HHmmss_ffff
-        # $OrderId = $Order.id | Get-ShopifyIdFromShopifyGid
-        # $StoreNumber = $LocationDefinition.RMSStoreNumber
-        # $ORIG_SYS_DOCUMENT_REF = "$StoreNumber-$OrderId"
-        # $ORIG_SYS_DOCUMENT_REF = $Order.EBSDocumentReference
         $OrderLineNumber = 0
         $Order.lineItems.edges.node | ForEach-Object {
             $OrderLineNumber++
@@ -558,6 +551,84 @@ function Convert-TervisShopifyRefundToEBSOrderLines {
                 LAST_UPDATED_BY_NAME = "SHOPIFY"
                 ACCESSORY = ""
                 # TAX_VALUE = $_.totalTaxSet.shopMoney.amount
+                TAX_VALUE = "" # For use in PRD until payments implemented
+            }
+        }
+    }
+}
+
+function Convert-TervisShopifyOrderToEBSOrderLines_Unified {
+    param (
+        [Parameter(Mandatory,ValueFromPipeline)]$Order
+    )
+    process {
+        $IsRefund = $Order.id -match "refund"
+        $OrderLineNumber = 0
+        $Order.refundLineItems.edges.node | ForEach-Object {
+            $OrderLineNumber++
+
+            if ($IsRefund) {
+                $LineType = "Tervis Credit Only Line"
+                $InventoryItem = $_.lineItem.sku
+                $OrderedQuantity = $_.quantity * -1
+                $UnitListPrice = $_.priceSet.shopMoney.amount
+                $UnitSellingPrice = $_.priceSet.shopMoney.amount
+                $ReturnReasonCode = "STORE RETURN"
+                $TaxValue = $_.totalTaxSet.shopMoney.amount
+            } else {
+                $LineType = "Tervis Bill Only with Inv Line"
+                $InventoryItem = $_.sku
+                $OrderedQuantity = $_.quantity
+                $UnitListPrice = $_.originalUnitPriceSet.shopMoney.amount
+                $UnitSellingPrice = $_.discountedUnitPriceSet.shopMoney.amount
+                $TaxValue = $_.taxLines.priceSet.shopMoney.amount | Measure-Object -Sum | Select-Object -ExpandProperty Sum
+            }
+
+            [PSCustomObject]@{
+                ORDER_SOURCE_ID = "1022" # For use during testing payments
+                ORIG_SYS_DOCUMENT_REF = $Order.EBSDocumentReference
+                ORIG_SYS_LINE_REF = $OrderLineNumber
+                ORIG_SYS_SHIPMENT_REF = ""
+                LINE_TYPE = $LineType
+                INVENTORY_ITEM = $InventoryItem
+                ORDERED_QUANTITY = $OrderedQuantity
+                ORDER_QUANTITY_UOM = "EA"
+                SHIP_FROM_ORG = "STO"
+                PRICE_LIST = ""
+                UNIT_LIST_PRICE = $UnitListPrice
+                UNIT_SELLING_PRICE = $UnitSellingPrice
+                CALCULATE_PRICE_FLAG = "P"
+                RETURN_REASON_CODE = $ReturnReasonCode
+                CUSTOMER_ITEM_ID_TYPE = ""
+                ATTRIBUTE1 = ""
+                ATTRIBUTE7 = ""
+                ATTRIBUTE13 = ""
+                ATTRIBUTE14 = ""
+                CREATION_DATE = $Order.createdAt | ConvertTo-TervisShopifyOracleSqlDateString
+                LAST_UPDATE_DATE = $Order.createdAt | ConvertTo-TervisShopifyOracleSqlDateString
+                SUBINVENTORY = $Order.Subinventory
+                EARLIEST_ACCEPTABLE_DATE = ""
+                LATEST_ACCEPTABLE_DATE = ""
+                GIFT_MESSAGE = ""
+                SIDE1_COLOR = ""
+                SIDE2_COLOR = ""
+                SIDE1_FONT = ""
+                SIDE2_FONT = ""
+                SIDE1_TEXT1 = ""
+                SIDE2_TEXT1 = ""
+                SIDE1_TEXT2 = ""
+                SIDE2_TEXT2 = ""
+                SIDE1_TEXT3 = ""
+                SIDE2_TEXT3 = ""
+                SIDE1_INITIALS = ""
+                SIDE2_INITIALS = ""
+                PROCESS_FLAG = "N"
+                SOURCE_NAME = "RMS"
+                OPERATING_UNIT_NAME = "Tervis Operating Unit"
+                CREATED_BY_NAME = "SHOPIFY"
+                LAST_UPDATED_BY_NAME = "SHOPIFY"
+                ACCESSORY = ""
+                # TAX_VALUE = $TaxValue
                 TAX_VALUE = "" # For use in PRD until payments implemented
             }
         }
