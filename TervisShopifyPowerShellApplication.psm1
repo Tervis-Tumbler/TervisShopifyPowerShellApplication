@@ -1083,7 +1083,8 @@ function New-EBSOrderLinePaymentSubquery {
 
 function Invoke-EBSSubqueryInsert {
     param (
-        [Parameter(Mandatory,ValueFromPipeline)]$Subquery
+        [Parameter(Mandatory,ValueFromPipeline)]$Subquery,
+        [switch]$ShowQuery
     )
     begin {
         $FinalQuery = "INSERT ALL"
@@ -1093,8 +1094,12 @@ function Invoke-EBSSubqueryInsert {
     }
     end {
         $FinalQuery += "`nSELECT 1 FROM DUAL"
+        if ($ShowQuery) {
+            return $FinalQuery
+        } else {
         Invoke-EBSSQL -SQLCommand $FinalQuery
     }
+}
 }
 
 function Invoke-TervisShopifyInterfaceInventoryUpdate {
