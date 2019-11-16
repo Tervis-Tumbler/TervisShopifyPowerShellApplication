@@ -335,6 +335,59 @@ function Set-TervisShopifyItemStagingTableUpdateFlag {
     Invoke-EBSSQL -SQLCommand $Query
 }
 
+function Invoke-TervisShopifyItemPrune {
+    param (
+        [Parameter(Mandatory)]$ShopName
+    )
+
+}
+
+function Get-TervisShopifyItemsAvailableInEBS {
+    $Query = @"
+        SELECT
+            item_id
+            ,item_number
+            ,item_description
+            ,item_status
+            ,item_price
+            ,price_list_name
+            ,upc
+            ,image_url
+        FROM xxtrvs.xxtrvs_store_item_price_intf
+        WHERE 1 = 1
+        AND item_status IN ('Active','DTCDeplete','Hold','Pending')
+"@
+    Invoke-EBSSQL -SQLCommand $Query
+}
+
+function Get-TervisShopifyNumberOfStoresWithItemQtyGreaterThanZero {
+    param (
+        # [Parameter(Mandatory)]$ShopName,
+        [Parameter(Mandatory)]$EbsItemNumber
+    )
+    $Query = @"
+        SELECT count(*)               
+        FROM xxtrvs.xxinv_store_ohq
+        WHERE 1 = 1
+        AND item_number = '$EbsItemNumber'
+        AND on_hand_qty > 0
+"@
+    Invoke-EBSSQL -SQLCommand $Query | Select-Object -ExpandProperty "COUNT(*)"
+}
+
+function Get-TervisShopifyItemEBSInventoryOnHandQuantityCount {
+    param (
+        [Parameter(Mandatory)]$EBSItemNumber
+    )
+    $Query = @"
+        SELECT SUM(on_hand_qty) ALLSTOREONHANDQTY
+        FROM xxtrvs.xxinv_store_ohq
+        WHERE 1 = 1
+        AND item_number = '$EBSItemNumber'
+"@
+    Invoke-EBSSQL -SQLCommand $Query | Select-Object -ExpandProperty ALLSTOREONHANDQTY
+}
+
 function Invoke-TervisShopifyInterfaceOrderImport {
     param (
         [Parameter(Mandatory)][ValidateSet("Delta","Epsilon","Production")]$Environment
