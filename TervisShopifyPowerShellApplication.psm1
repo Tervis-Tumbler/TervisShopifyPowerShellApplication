@@ -757,8 +757,12 @@ function Convert-TervisShopifyPaymentsToEBSPayment {
             $CreditCardNumber = $Transaction | New-TervisShopifyCCDummyNumber
             $CreditCardName = $Transaction | New-TervisShopifyCCName
             $CreditCardCode = if ($Transaction.gateway -eq "shopify_payments") {"UNKNOWN"}
-            $CreditCardApprovalDate = if ($CreditCardNumber) {$Transaction.processed_at | ConvertTo-TervisShopifyOracleSqlDateString}
-            $CheckNumber = if ($PaymentTypeCode -eq "CHECK") {""}
+            $CreditCardApprovalDate = if ($CreditCardNumber) {
+                    $Transaction.processed_at | ConvertTo-TervisShopifyOracleSqlDateString
+                } else {
+                    "''"
+                }
+            # $CheckNumber = if ($PaymentTypeCode -eq "CHECK") {""}
             $ReceiptMethodId = Get-TervisShopifyReceiptMethod -ReceiptMethodId $Order.ReceiptMethodId -PaymentTypeCode $PaymentTypeCode # if ($PaymentTypeCode -eq "CHECK") {$Order.ReceiptMethodId}
 
             [PSCustomObject]@{
@@ -774,7 +778,7 @@ function Convert-TervisShopifyPaymentsToEBSPayment {
                 # CREDIT_CARD_CODE = ''
                 CREDIT_CARD_APPROVAL_CODE = $Transaction.authorization
                 CREDIT_CARD_APPROVAL_DATE = $CreditCardApprovalDate
-                CHECK_NUMBER = $CheckNumber
+                # CHECK_NUMBER = $CheckNumber
                 PAYMENT_AMOUNT = $Transaction.amount
                 CREATION_DATE = "sysdate"
                 LAST_UPDATE_DATE = "sysdate"
@@ -788,6 +792,7 @@ function Convert-TervisShopifyPaymentsToEBSPayment {
                 CREATED_BY_NAME = "SHOPIFY"
                 LAST_UPDATED_BY_NAME = "SHOPIFY"
                 RECEIPT_METHOD_ID = $ReceiptMethodId
+                PAYMENT_TRX_ID = $Transaction.id
             }
         }
     }
@@ -1077,7 +1082,7 @@ function New-EBSOrderLinePaymentSubquery {
 
     process {
         $Query = @"
-        INTO xxoe_payments_iface_all 
+        INTO xxoe_payments_iface_all
         (
             ORDER_SOURCE_ID,
             ORIG_SYS_DOCUMENT_REF,
@@ -1101,7 +1106,8 @@ function New-EBSOrderLinePaymentSubquery {
             OPERATING_UNIT_NAME,
             CREATED_BY_NAME,
             LAST_UPDATED_BY_NAME,
-            RECEIPT_METHOD_ID
+            RECEIPT_METHOD_ID,
+            PAYMENT_TRX_ID
         )
         VALUES
         (
@@ -1127,7 +1133,8 @@ function New-EBSOrderLinePaymentSubquery {
             '$($ConvertedPayment.OPERATING_UNIT_NAME)',
             '$($ConvertedPayment.CREATED_BY_NAME)',
             '$($ConvertedPayment.LAST_UPDATED_BY_NAME)',
-            '$($ConvertedPayment.RECEIPT_METHOD_ID)'
+            '$($ConvertedPayment.RECEIPT_METHOD_ID)',
+            '$($ConvertedPayment.PAYMENT_TRX_ID)'
         )
 
 "@
@@ -1151,7 +1158,7 @@ function Invoke-EBSSubqueryInsert {
         if ($ShowQuery) {
             return $FinalQuery
         } else {
-        Invoke-EBSSQL -SQLCommand $FinalQuery
+            Invoke-EBSSQL -SQLCommand $FinalQuery
         }
     }
 }
