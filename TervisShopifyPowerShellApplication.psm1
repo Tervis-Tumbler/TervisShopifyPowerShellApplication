@@ -616,8 +616,9 @@ function Convert-TervisShopifyOrderToEBSOrderLines_Unified {
     )
     process {
         $IsRefund = $Order.id -match "refund"
+        $LineItemType = if ($IsRefund) {"refundLineItems"} else {"lineItems"}
         $OrderLineNumber = 0
-        $Order.refundLineItems.edges.node | ForEach-Object {
+        $Order.$LineItemType.edges.node | ForEach-Object {
             $OrderLineNumber++
 
             if ($IsRefund) {
