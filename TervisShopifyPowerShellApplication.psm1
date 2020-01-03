@@ -763,7 +763,8 @@ function Convert-TervisShopifyPaymentsToEBSPayment {
                     "''"
                 }
             # $CheckNumber = if ($PaymentTypeCode -eq "CHECK") {""}
-            $ReceiptMethodId = Get-TervisShopifyReceiptMethod -ReceiptMethodId $Order.ReceiptMethodId -PaymentTypeCode $PaymentTypeCode # if ($PaymentTypeCode -eq "CHECK") {$Order.ReceiptMethodId}
+            # $ReceiptMethodId = Get-TervisShopifyReceiptMethod -ReceiptMethodId $Order.ReceiptMethodId -PaymentTypeCode $PaymentTypeCode # if ($PaymentTypeCode -eq "CHECK") {$Order.ReceiptMethodId}
+            $ReceiptMethodId = Get-TervisShopifyReceiptMethod -PaymentTypeCode $PaymentTypeCode
 
             [PSCustomObject]@{
                 # ORDER_SOURCE_ID = "1101"
@@ -853,11 +854,11 @@ function New-TervisShopifyCCName {
 
 function Get-TervisShopifyReceiptMethod {
     param (
-        [Parameter(Mandatory)]$ReceiptMethodId,
+        # [Parameter(Mandatory)]$ReceiptMethodId,
         [Parameter(Mandatory)]$PaymentTypeCode
     )
     switch ($PaymentTypeCode) {
-        "CHECK" { $ReceiptMethodId; break }
+        # "CHECK" { $ReceiptMethodId; break } # This is now handled in EBS
         "CASH" { "8001"; break }
         "CREDIT_CARD" { "11001"; break }
         default {""}
