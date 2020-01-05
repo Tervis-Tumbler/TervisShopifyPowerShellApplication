@@ -1014,10 +1014,14 @@ function Convert-TervisShopifyCustomAttributesToObject {
     }
 }
 
+# New method to take Order objects and convert them to an EBS query. Dynamic based
+# on PSCustomObject property names, instead of manual mapping done earlier with
+# Convert-TervisShopify*ToEBS* and New-EBS*Subquery
 function Convert-TervisShopifyOrderObjectToEBSQuery {
     param (
-        [Parameter(Mandatory,ValueFromPipelineByPropertyName)]$EBSDocumentReference,
-        [Parameter(Mandatory,ValueFromPipelineByPropertyName)]$CustomerInformation,
+        [Parameter(Mandatory,ValueFromPipelineByPropertyName)]$Header,
+        [Parameter(Mandatory,ValueFromPipelineByPropertyName)]$CustomerOrganization,
+        [Parameter(Mandatory,ValueFromPipelineByPropertyName)]$CustomerContact,
         [Parameter(Mandatory,ValueFromPipelineByPropertyName)]$LineItems
     )
     begin {
@@ -1028,10 +1032,50 @@ INSERT ALL
     }
     process {
         # Convert to header
-        
+        $HeaderProperties = $Header | 
+            Get-Member -MemberType NoteProperty | 
+            Select-Object -ExpandProperty Name
+        $HeaderPropertyValues = $HeaderProperties | ForEach-Object {
+            $Header.$_
+        }
+        $Query += "INTO xxoe_headers_iface_all ($($HeaderProperties -join ","))`n"
+        $Query += "VALUES ($($HeaderPropertyValues -join ","))`n"
+
         # Convert to customer
+        $CustomerContactProperties = $CustomerContact | 
+            Get-Member -MemberType NoteProperty | 
+            Select-Object -ExpandProperty Name
+        $CustomerContactValues = $CustomerContactProperties | ForEach-Object {
+            $CustomerContact.$_
+        }
+        $Query += "INTO XXOE_CUSTOMER_INFO_IFACE_ALL ($($CustomerContactProperties -join ","))`n"
+        $Query += "VALUES ($($CustomerContactValues -join ","))`n"
+
+        $CustomerOrganizationProperties = $CustomerOrganization | 
+            Get-Member -MemberType NoteProperty | 
+            Select-Object -ExpandProperty Name
+        $CustomerOrganizationValues = $CustomerOrganizationProperties | ForEach-Object {
+            $CustomerOrganization.$_
+        }
+        $Query += "INTO XXOE_CUSTOMER_INFO_IFACE_ALL ($($CustomerOrganizationProperties -join ","))`n"
+        $Query += "VALUES ($($CustomerOrganizationValues -join ","))`n"
         # Convert to lines
+        # ERROR: this is returning the origsysdocref with an extra set of single quotes
+        foreach ($Line in $LineItems) {
+            $LineProperties = $Line | 
+                Get-Member -MemberType NoteProperty | 
+                Select-Object -ExpandProperty Name
+            $LineValues = $LineProperties | ForEach-Object {
+                $Line.$_
+            }
+            $Query += "INTO xxoe_lines_iface_all ($($LineProperties -join ","))`n"
+            $Query += "VALUES ($($LineValues -join ","))`n"
+        }
         # Convert to payment (later, after personalization/EA)
+    }
+    end {
+        $Query += "SELECT 1 FROM DUAL`n"
+        $Query
     }
 }
 
