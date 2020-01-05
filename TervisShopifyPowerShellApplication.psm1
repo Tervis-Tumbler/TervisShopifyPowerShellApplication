@@ -876,6 +876,176 @@ function ConvertTo-TervisShopifyOracleSqlDateString {
     }
 }
 
+function New-TervisShopifyPersonalizedObjects {
+    param (
+        [Parameter(Mandatory,ValueFromPipeline)]$Order
+    )
+    process {
+        $OrigSysDocumentRef = "'$($Order.EBSDocumentReference)P'"
+        $PersonalizedObject = [PSCustomObject]@{
+            Header = [PSCustomObject]@{
+                ORDER_SOURCE_ID = "1022"
+                ORIG_SYS_DOCUMENT_REF = $OrigSysDocumentRef
+                ORDERED_DATE = $Order.createdAt | ConvertTo-TervisShopifyOracleSqlDateString
+                ORDER_TYPE = "'DTC Sales Order'"
+                SHIPPING_METHOD_CODE = "'000001_FEDEX_P_GND'" # this should be a separate function to determine ship method
+                CUSTOMER_NUMBER = "'376088'" # should this always be 376088? I think this is Osprey's number
+                BOOKED_FLAG = "'Y'"
+                CREATION_DATE = "sysdate"
+                LAST_UPDATE_DATE = "sysdate"
+                ORIG_SYS_CUSTOMER_REF = $OrigSysDocumentRef
+                ORIG_SHIP_ADDRESS_REF = $OrigSysDocumentRef
+                SHIP_TO_CONTACT_REF = $OrigSysDocumentRef
+                ATTRIBUTE6 = "'Y'"
+                PROCESS_FLAG = "'N'"
+                SOURCE_NAME = "'RMS'"
+                OPERATING_UNIT_NAME = "'Tervis Operating Unit'"
+                CREATED_BY_NAME = "'SHOPIFY'"
+                LAST_UPDATED_BY_NAME = "'SHOPIFY'"
+            }
+            CustomerOrganization = [PSCustomObject]@{
+                ORIG_SYS_DOCUMENT_REF = $OrigSysDocumentRef
+                PARENT_CUSTOMER_REF = "'376088'"
+                PERSON_FIRST_NAME = "'$($Order.customer.firstName)'"
+                PERSON_LAST_NAME = "'$($Order.customer.lastName)'"
+                ADDRESS1 = "'$($Order.customer.defaultAddress.address1)'"
+                ADDRESS2 = "'$($Order.customer.defaultAddress.address2)'"
+                CITY = "'$($Order.customer.defaultAddress.city)'"
+                STATE = "'$($Order.customer.defaultAddress.province)'"
+                POSTAL_CODE = "'$($Order.customer.defaultAddress.zip)'"
+                COUNTRY = "'$($Order.customer.defaultAddress.countryCodeV2)'"
+                PROCESS_FLAG = "'N'"
+                SOURCE_NAME = "'RMS'"
+                OPERATING_UNIT_NAME = "'Tervis Operating Unit'"
+                CREATED_BY_NAME = "'SHOPIFY'"
+                LAST_UPDATED_BY_NAME = "'SHOPIFY'"
+                CREATION_DATE = "sysdate"
+                # Below only applies to CUSTOMER_TYPE "ORGANIZATION" 
+                PARTY_ID = "360580"
+                CUSTOMER_TYPE = "'ORGANIZATION'"
+                ORGANIZATION_NAME = "'$($Order.customer.displayName)'"
+                CUSTOMER_INFO_TYPE_CODE = "'ADDRESS'"
+                IS_SHIP_TO_ADDRESS = "'Y'"
+                IS_BILL_TO_ADDRESS = "'N'"
+                FREIGHT_TERMS = "'Freight Collect'"
+                SHIP_METHOD_CODE = "'000001_FEDEX_P_GND'"
+            }
+            CustomerContact = [PSCustomObject]@{
+                ORIG_SYS_DOCUMENT_REF = $OrigSysDocumentRef
+                PARENT_CUSTOMER_REF = "'376088'"
+                PERSON_FIRST_NAME = "'$($Order.customer.firstName)'"
+                PERSON_LAST_NAME = "'$($Order.customer.lastName)'"
+                ADDRESS1 = "'$($Order.customer.defaultAddress.address1)'"
+                ADDRESS2 = "'$($Order.customer.defaultAddress.address2)'"
+                CITY = "'$($Order.customer.defaultAddress.city)'"
+                STATE = "'$($Order.customer.defaultAddress.province)'"
+                POSTAL_CODE = "'$($Order.customer.defaultAddress.zip)'"
+                COUNTRY = "'$($Order.customer.defaultAddress.countryCodeV2)'"
+                PROCESS_FLAG = "'N'"
+                SOURCE_NAME = "'RMS'"
+                OPERATING_UNIT_NAME = "'Tervis Operating Unit'"
+                CREATED_BY_NAME = "'SHOPIFY'"
+                LAST_UPDATED_BY_NAME = "'SHOPIFY'"
+                CREATION_DATE = "sysdate"
+                # Below only applies to CUSTOMER_TYPE "null"
+                CUSTOMER_INFO_TYPE_CODE = "'CONTACT'"
+                IS_SHIPPING_CONTACT = "'Y'"
+            }
+            LineItems = @()
+        }
+
+        $PersonalizationLines = $Order.lineItems.edges.node | 
+            Where-Object name -Match "Personalization for sku" # This should be updated to look for a specific SKU or something
+        
+        $LineCounter = 0
+        $PersonalizedObject.LineItems += foreach ($Line in $PersonalizationLines) {
+            $LineCounter++
+            $CustomAttributes = $Line | Convert-TervisShopifyCustomAttributesToObject
+            [PSCustomObject]@{
+                # For EBS
+                ORDER_SOURCE_ID = "'1022'"
+                ORIG_SYS_DOCUMENT_REF = "'$($OrigSysDocumentRef)'"
+                ORIG_SYS_LINE_REF = "'$($LineCounter)'"
+                LINE_TYPE = "'Tervis Bill Only with Inv Line'"
+                CREATION_DATE = "sysdate"
+                LAST_UPDATE_DATE = "sysdate"
+                PROCESS_FLAG = "'N'"
+                SOURCE_NAME = "'RMS'"
+                OPERATING_UNIT_NAME = "'Tervis Operating Unit'"
+                CREATED_BY_NAME = "'SHOPIFY'"
+                LAST_UPDATED_BY_NAME = "'SHOPIFY'"
+                
+                # From Shopify
+                INVENTORY_ITEM = "'$($CustomAttributes.RelatedLineItemSKU)'"
+                ORDERED_QUANTITY = "$($Line.quantity)"
+                UNIT_SELLING_PRICE = "0" # $Line.discountedUnitPriceSet.shopMoney.amount # Might not be relevant
+                UNIT_LIST_PRICE = "0"
+                
+                SIDE1_FONT = "'$($CustomAttributes.FontName)'" # Need to diff between side 1 and 2
+                SIDE1_COLOR = "'$($CustomAttributes.FontColor)'" # Need to diff between side 1 and 2
+                ATTRIBUTE1 = "'$($CustomAttributes.Side1CustomerProvided)'" # CustomerProvided = PersGrap, Other              
+                SIDE1_TEXT1 = "'$($CustomAttributes.Side1Line1)'"
+                SIDE1_TEXT2 = "'$($CustomAttributes.Side1Line2)'"
+                SIDE1_TEXT3 = "'$($CustomAttributes.Side1Line3)'"
+                
+                SIDE2_FONT = "'$($CustomAttributes.FontName)'" # Need to diff between side 1 and 2
+                SIDE2_COLOR = "'$($CustomAttributes.FontColor)'" # Need to diff between side 1 and 2
+                ATTRIBUTE7 = "'$($CustomAttributes.Side2CustomerProvided)'" # CustomerProvided = PersGrap, Other
+                SIDE2_TEXT1 = "'$($CustomAttributes.Side2Line1)'"
+                SIDE2_TEXT2 = "'$($CustomAttributes.Side2Line2)'"
+                SIDE2_TEXT3 = "'$($CustomAttributes.Side2Line3)'"
+            }
+        }
+
+        return $PersonalizedObject
+    }
+}
+
+function Convert-TervisShopifyCustomAttributesToObject {
+    param (
+        [Parameter(Mandatory,ValueFromPipeline)]$Node
+    )
+    process {
+        $Object = [PSCustomObject]::new()
+        foreach ($Attribute in $Node.customAttributes) {
+            $Object | Add-Member -MemberType NoteProperty -Name $Attribute.key -Value $Attribute.value -Force
+        }
+        return $Object
+    }
+}
+
+function Convert-TervisShopifyOrderObjectToEBSQuery {
+    param (
+        [Parameter(Mandatory,ValueFromPipelineByPropertyName)]$EBSDocumentReference,
+        [Parameter(Mandatory,ValueFromPipelineByPropertyName)]$CustomerInformation,
+        [Parameter(Mandatory,ValueFromPipelineByPropertyName)]$LineItems
+    )
+    begin {
+        $Query = @"
+INSERT ALL
+
+"@
+    }
+    process {
+        # Convert to header
+        
+        # Convert to customer
+        # Convert to lines
+        # Convert to payment (later, after personalization/EA)
+    }
+}
+
+# Might not be needed, checking personalization based on the presence of 
+# "Personalization" line items
+function Test-TervisShopifyIsPersonalizedOrder {
+    param (
+        [Parameter(Mandatory,ValueFromPipeline)]$Order
+    )
+    process {
+        $Order.EBSDocumentReference[-1] -eq "P"
+    }
+}
+
 function New-EBSOrderLineSubquery {
     param (
         [Parameter(Mandatory,ValueFromPipeline)]$ConvertedOrder
