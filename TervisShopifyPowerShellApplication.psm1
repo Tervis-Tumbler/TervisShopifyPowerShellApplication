@@ -882,14 +882,17 @@ function New-TervisShopifyPersonalizedObjects {
     )
     process {
         $OrigSysDocumentRef = "'$($Order.EBSDocumentReference)P'"
+        $OrderedDate = $Order.createdAt | ConvertTo-TervisShopifyOracleSqlDateString
+        $CustomerPONumber = "'$($OrigSysDocumentRef.Trim("'").Split("-")[1])-$($Order.customer.displayName)'"
         $PersonalizedObject = [PSCustomObject]@{
             Header = [PSCustomObject]@{
                 ORDER_SOURCE_ID = "1022"
                 ORIG_SYS_DOCUMENT_REF = $OrigSysDocumentRef
-                ORDERED_DATE = $Order.createdAt | ConvertTo-TervisShopifyOracleSqlDateString
+                ORDERED_DATE = $OrderedDate
                 ORDER_TYPE = "'DTC Sales Order'"
                 SHIPPING_METHOD_CODE = "'000001_FEDEX_P_GND'" # this should be a separate function to determine ship method
-                CUSTOMER_NUMBER = "'376088'" # should this always be 376088? I think this is Osprey's number
+                CUSTOMER_NUMBER = "'$($Order.StoreCustomerNumber)'" # Trying with store customer number from order
+                CUSTOMER_PO_NUMBER = $CustomerPONumber
                 BOOKED_FLAG = "'Y'"
                 CREATION_DATE = "sysdate"
                 LAST_UPDATE_DATE = "sysdate"
@@ -902,10 +905,11 @@ function New-TervisShopifyPersonalizedObjects {
                 OPERATING_UNIT_NAME = "'Tervis Operating Unit'"
                 CREATED_BY_NAME = "'SHOPIFY'"
                 LAST_UPDATED_BY_NAME = "'SHOPIFY'"
+                CUSTOMER_REQUESTED_DATE = "sysdate"
             }
-            CustomerOrganization = [PSCustomObject]@{
+            Customer = [PSCustomObject]@{
                 ORIG_SYS_DOCUMENT_REF = $OrigSysDocumentRef
-                PARENT_CUSTOMER_REF = "'376088'"
+                PARENT_CUSTOMER_REF = "'$($Order.StoreCustomerNumber)'" # Trying with store customer number from order
                 PERSON_FIRST_NAME = "'$($Order.customer.firstName)'"
                 PERSON_LAST_NAME = "'$($Order.customer.lastName)'"
                 ADDRESS1 = "'$($Order.customer.defaultAddress.address1)'"
@@ -925,46 +929,28 @@ function New-TervisShopifyPersonalizedObjects {
                 CUSTOMER_TYPE = "'ORGANIZATION'"
                 ORGANIZATION_NAME = "'$($Order.customer.displayName)'"
                 CUSTOMER_INFO_TYPE_CODE = "'ADDRESS'"
+                CUSTOMER_INFO_REF = $OrigSysDocumentRef
                 IS_SHIP_TO_ADDRESS = "'Y'"
                 IS_BILL_TO_ADDRESS = "'N'"
                 FREIGHT_TERMS = "'Freight Collect'"
                 SHIP_METHOD_CODE = "'000001_FEDEX_P_GND'"
             }
-            CustomerContact = [PSCustomObject]@{
-                ORIG_SYS_DOCUMENT_REF = $OrigSysDocumentRef
-                PARENT_CUSTOMER_REF = "'376088'"
-                PERSON_FIRST_NAME = "'$($Order.customer.firstName)'"
-                PERSON_LAST_NAME = "'$($Order.customer.lastName)'"
-                ADDRESS1 = "'$($Order.customer.defaultAddress.address1)'"
-                ADDRESS2 = "'$($Order.customer.defaultAddress.address2)'"
-                CITY = "'$($Order.customer.defaultAddress.city)'"
-                STATE = "'$($Order.customer.defaultAddress.province)'"
-                POSTAL_CODE = "'$($Order.customer.defaultAddress.zip)'"
-                COUNTRY = "'$($Order.customer.defaultAddress.countryCodeV2)'"
-                PROCESS_FLAG = "'N'"
-                SOURCE_NAME = "'RMS'"
-                OPERATING_UNIT_NAME = "'Tervis Operating Unit'"
-                CREATED_BY_NAME = "'SHOPIFY'"
-                LAST_UPDATED_BY_NAME = "'SHOPIFY'"
-                CREATION_DATE = "sysdate"
-                # Below only applies to CUSTOMER_TYPE "null"
-                CUSTOMER_INFO_TYPE_CODE = "'CONTACT'"
-                IS_SHIPPING_CONTACT = "'Y'"
-            }
             LineItems = @()
         }
 
         $PersonalizationLines = $Order.lineItems.edges.node | 
-            Where-Object name -Match "Personalization for sku" # This should be updated to look for a specific SKU or something
+            Where-Object name -Match "Personalization for" # This should be updated to look for a specific SKU or something
         
         $LineCounter = 0
         $PersonalizedObject.LineItems += foreach ($Line in $PersonalizationLines) {
             $LineCounter++
             $CustomAttributes = $Line | Convert-TervisShopifyCustomAttributesToObject
+            $CustomerSuppliedProperties = $CustomAttributes | New-TervisShopifyCustomerSuppliedProperties
+
             [PSCustomObject]@{
                 # For EBS
                 ORDER_SOURCE_ID = "'1022'"
-                ORIG_SYS_DOCUMENT_REF = "'$($OrigSysDocumentRef)'"
+                ORIG_SYS_DOCUMENT_REF = $OrigSysDocumentRef
                 ORIG_SYS_LINE_REF = "'$($LineCounter)'"
                 LINE_TYPE = "'Tervis Bill Only with Inv Line'"
                 CREATION_DATE = "sysdate"
@@ -981,19 +967,21 @@ function New-TervisShopifyPersonalizedObjects {
                 UNIT_SELLING_PRICE = "0" # $Line.discountedUnitPriceSet.shopMoney.amount # Might not be relevant
                 UNIT_LIST_PRICE = "0"
                 
-                SIDE1_FONT = "'$($CustomAttributes.FontName)'" # Need to diff between side 1 and 2
-                SIDE1_COLOR = "'$($CustomAttributes.FontColor)'" # Need to diff between side 1 and 2
-                ATTRIBUTE1 = "'$($CustomAttributes.Side1CustomerProvided)'" # CustomerProvided = PersGrap, Other              
-                SIDE1_TEXT1 = "'$($CustomAttributes.Side1Line1)'"
-                SIDE1_TEXT2 = "'$($CustomAttributes.Side1Line2)'"
-                SIDE1_TEXT3 = "'$($CustomAttributes.Side1Line3)'"
+                SIDE1_FONT = "'$($CustomAttributes.Side1FontName)'"
+                SIDE1_COLOR = "'$($CustomAttributes.Side1ColorName)'"
+                ATTRIBUTE1 = "'$($CustomerSuppliedProperties.Side1CustomerSupplied)'" # CustomerProvided = PersGrap, Other              
+                SIDE1_TEXT1 = "'$($CustomAttributes.Side1Line1 | Invoke-TervisShopifyOracleStringEscapeQuotes)'"
+                SIDE1_TEXT2 = "'$($CustomAttributes.Side1Line2 | Invoke-TervisShopifyOracleStringEscapeQuotes)'"
+                SIDE1_TEXT3 = "'$($CustomAttributes.Side1Line3 | Invoke-TervisShopifyOracleStringEscapeQuotes)'"
                 
-                SIDE2_FONT = "'$($CustomAttributes.FontName)'" # Need to diff between side 1 and 2
-                SIDE2_COLOR = "'$($CustomAttributes.FontColor)'" # Need to diff between side 1 and 2
-                ATTRIBUTE7 = "'$($CustomAttributes.Side2CustomerProvided)'" # CustomerProvided = PersGrap, Other
-                SIDE2_TEXT1 = "'$($CustomAttributes.Side2Line1)'"
-                SIDE2_TEXT2 = "'$($CustomAttributes.Side2Line2)'"
-                SIDE2_TEXT3 = "'$($CustomAttributes.Side2Line3)'"
+                SIDE2_FONT = "'$($CustomAttributes.FontName)'"
+                SIDE2_COLOR = "'$($CustomAttributes.FontColor)'"
+                ATTRIBUTE7 = "'$($CustomerSuppliedProperties.Side2CustomerSupplied)'" # CustomerProvided = PersGrap, Other
+                SIDE2_TEXT1 = "'$($CustomAttributes.Side2Line1 | Invoke-TervisShopifyOracleStringEscapeQuotes)'"
+                SIDE2_TEXT2 = "'$($CustomAttributes.Side2Line2 | Invoke-TervisShopifyOracleStringEscapeQuotes)'"
+                SIDE2_TEXT3 = "'$($CustomAttributes.Side2Line3 | Invoke-TervisShopifyOracleStringEscapeQuotes)'"
+
+                ATTRIBUTE14 = "'$($CustomerSuppliedProperties.CustomerSuppliedDecorationNote)'"
             }
         }
 
@@ -1014,14 +1002,55 @@ function Convert-TervisShopifyCustomAttributesToObject {
     }
 }
 
+function New-TervisShopifyCustomerSuppliedProperties {
+    param (
+        [Parameter(Mandatory,ValueFromPipeline)]$CustomAttributes
+    )
+    process {
+        $Side1CustomerSupplied = if ($CustomAttributes.Side1IsCustomerSuppliedDecoration -eq "true") {
+            "Other"
+        } elseif ($CustomAttributes.Side1 -eq "true") {
+            "PersGrap"
+        } else {""}
+        $Side2CustomerSupplied = if ($CustomAttributes.Side2IsCustomerSuppliedDecoration -eq "true") {
+            "Other"
+        } elseif ($CustomAttributes.Side2 -eq "true") {
+            "PersGrap"
+        } else {""}
+        $DecorationNotes = @()
+        if ($CustomAttributes.Side1CustomerSuppliedDecorationNote) {
+            $DecorationNotes += "SIDE 1 ~~CUSTSUP~~$($CustomAttributes.Side1CustomerSuppliedDecorationNote)"
+        }
+        if ($CustomAttributes.Side2CustomerSuppliedDecorationNote) {
+            $DecorationNotes += "SIDE 2 ~~CUSTSUP~~$($CustomAttributes.Side2CustomerSuppliedDecorationNote)"
+        }
+        $DecorationNoteString = $DecorationNotes -join " " | Invoke-TervisShopifyOracleStringEscapeQuotes
+        # $DecorationNoteString = $DecorationNoteString -Replace "[^\w\s.,]","_"
+
+        return [PSCustomObject]@{
+            Side1CustomerSupplied = $Side1CustomerSupplied
+            Side2CustomerSupplied = $Side2CustomerSupplied
+            CustomerSuppliedDecorationNote = $DecorationNoteString
+        }
+    }
+}
+
+function Invoke-TervisShopifyOracleStringEscapeQuotes {
+    param (
+        [Parameter(ValueFromPipeline)]$String
+    )
+    process {
+        $String -replace "'","''"
+    }
+}
+
 # New method to take Order objects and convert them to an EBS query. Dynamic based
 # on PSCustomObject property names, instead of manual mapping done earlier with
 # Convert-TervisShopify*ToEBS* and New-EBS*Subquery
 function Convert-TervisShopifyOrderObjectToEBSQuery {
     param (
         [Parameter(Mandatory,ValueFromPipelineByPropertyName)]$Header,
-        [Parameter(Mandatory,ValueFromPipelineByPropertyName)]$CustomerOrganization,
-        [Parameter(Mandatory,ValueFromPipelineByPropertyName)]$CustomerContact,
+        [Parameter(Mandatory,ValueFromPipelineByPropertyName)]$Customer,
         [Parameter(Mandatory,ValueFromPipelineByPropertyName)]$LineItems
     )
     begin {
@@ -1042,25 +1071,15 @@ INSERT ALL
         $Query += "VALUES ($($HeaderPropertyValues -join ","))`n"
 
         # Convert to customer
-        $CustomerContactProperties = $CustomerContact | 
+        $CustomerProperties = $Customer | 
             Get-Member -MemberType NoteProperty | 
             Select-Object -ExpandProperty Name
-        $CustomerContactValues = $CustomerContactProperties | ForEach-Object {
-            $CustomerContact.$_
+        $CustomerValues = $CustomerProperties | ForEach-Object {
+            $Customer.$_
         }
-        $Query += "INTO XXOE_CUSTOMER_INFO_IFACE_ALL ($($CustomerContactProperties -join ","))`n"
-        $Query += "VALUES ($($CustomerContactValues -join ","))`n"
-
-        $CustomerOrganizationProperties = $CustomerOrganization | 
-            Get-Member -MemberType NoteProperty | 
-            Select-Object -ExpandProperty Name
-        $CustomerOrganizationValues = $CustomerOrganizationProperties | ForEach-Object {
-            $CustomerOrganization.$_
-        }
-        $Query += "INTO XXOE_CUSTOMER_INFO_IFACE_ALL ($($CustomerOrganizationProperties -join ","))`n"
-        $Query += "VALUES ($($CustomerOrganizationValues -join ","))`n"
+        $Query += "INTO xxoe_customer_info_iface_all ($($CustomerProperties -join ","))`n"
+        $Query += "VALUES ($($CustomerValues -join ","))`n"
         # Convert to lines
-        # ERROR: this is returning the origsysdocref with an extra set of single quotes
         foreach ($Line in $LineItems) {
             $LineProperties = $Line | 
                 Get-Member -MemberType NoteProperty | 
