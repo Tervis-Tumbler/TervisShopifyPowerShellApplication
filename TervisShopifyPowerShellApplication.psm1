@@ -1735,3 +1735,23 @@ function Set-TervisShopifyInventoryStagingTableUpdateFlagOnSyncedInventory {
 
     # Export-Clixml -InputObject $InventoryArray -Path "C:\Logs\InventoryAlreadySynced_$SubinventoryCode.xml" -Force
 }
+
+function Get-TervisShopifyPersonalizableItems {
+    $pItems = Invoke-EBSSQL "SELECT segment1 FROM apps.mtl_system_items_b WHERE organization_id = 85 AND inventory_item_status_code = 'Active' AND segment1 LIKE '%P'"
+    $pItems | ForEach-Object {
+        $_.segment1.Trim("P")
+    }
+}
+
+function Update-TervisShopifyPersonalizableItemNPMPackage {
+    param (
+        [Parameter(Mandatory)]$PackagePath
+    )
+    Set-Location -Path $PackagePath
+    $PersonalizableItems = Get-TervisShopifyPersonalizableItems 
+    $PersonalizableItems | ConvertTo-Json -Compress | Out-File -FilePath "./TervisPersonalizableItems.json" -Force
+    $CommitMessage = "$(Get-Date -Format 'yyyyMMdd_HHmmss') - $($PersonalizableItems.Count) items"
+    git commit -a -m '$($CommitMessage)'
+    npm version patch
+    npm publish
+}
