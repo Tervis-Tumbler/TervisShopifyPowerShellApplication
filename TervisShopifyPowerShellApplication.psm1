@@ -199,11 +199,11 @@ function Install-TervisShopifyPowerShellApplication_PersonalizableItems {
                 "TervisShopify",
                 "TervisShopifyPowerShellApplication"
             NugetDependencies = "Oracle.ManagedDataAccess.Core"
-            ScheduledTaskName = "ShopifyPersonalizedItemListUpdate"
+            ScheduledTaskName = "ShopifyPersonalizedItemListUpload"
             RepetitionIntervalName = "EveryDayAt6am"
             CommandString = @"
 Set-TervisEBSEnvironment -Name $EnvironmentName 2> `$null
-Update-TervisShopifyPersonalizableItemNPMPackage -PackagePath `$env:USERPROFILE\TervisPersonalizableItemsJS
+Invoke-TervisShopifyPersonalizableItemListUpload -PackagePath `$env:USERPROFILE\TervisPersonalizableItemsJS
 "@
             ScheduledTasksCredential = $ScheduledTasksCredential
         }
@@ -1798,16 +1798,26 @@ function Get-TervisShopifyPersonalizableItems {
     }
 }
 
-function Update-TervisShopifyPersonalizableItemNPMPackage {
+function Invoke-TervisShopifyPersonalizableItemListUpload {
     param (
         [Parameter(Mandatory)]$PackagePath
     )
-    Set-Location -Path $PackagePath
-    $PersonalizableItems = Get-TervisShopifyPersonalizableItems 
-    $PersonalizableItems | ConvertTo-Json -Compress | Out-File -FilePath "./TervisPersonalizableItems.json" -Force -Encoding utf8
-    $CommitMessage = "$(Get-Date -Format 'yyyyMMdd_HHmmss') - $($PersonalizableItems.Count) items"
-    git commit -a -m "'$($CommitMessage)'"
-    npm version patch
-    npm publish
-    git push origin master
+    Write-EventLog -LogName Shopify -Source "PersonalizableItem Update" -EntryType Information -EventId 1 `
+        -Message "Starting personalizable item upload"
+    try {
+        Set-Location -Path $PackagePath
+        $PersonalizableItems = Get-TervisShopifyPersonalizableItems 
+        $PersonalizableItems | ConvertTo-Json -Compress | Out-File -FilePath "./TervisPersonalizableItems.json" -Force -Encoding utf8
+        $CommitMessage = "$(Get-Date -Format 'yyyyMMdd_HHmmss') - $($PersonalizableItems.Count) items"
+        git commit -a -m "'$($CommitMessage)'"
+        $PatchNumber = npm version patch
+        npm publish
+        git push origin master
+        Write-EventLog -LogName Shopify -Source "PersonalizableItem Update" -EntryType Information -EventId 1 `
+            -Message "Personalizable item updated to $PatchNumber`n$CommitMessage"
+    } catch {
+        Write-EventLog -LogName Shopify -Source "PersonalizableItem Update" -EntryType Error -EventId 2 `
+            -Message "Something went wrong.`nReason:`n$_`n$($_.InvocationInfo.PositionMessage)"
+    }
+    
 }
