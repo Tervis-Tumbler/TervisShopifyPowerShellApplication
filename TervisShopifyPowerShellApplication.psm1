@@ -1814,7 +1814,7 @@ function Invoke-TervisShopifyPersonalizableItemListUpload {
         npm publish
         git push origin master
         Write-EventLog -LogName Shopify -Source "Personalizable Item List Upload" -EntryType Information -EventId 1 `
-            -Message "Personalizable item updated to $PatchNumber`n$CommitMessage"
+            -Message "Personalizable item list updated to $PatchNumber`nCommit: '$CommitMessage'"
     } catch {
         Write-EventLog -LogName Shopify -Source "Personalizable Item List Upload" -EntryType Error -EventId 2 `
             -Message "Something went wrong.`nReason:`n$_`n$($_.InvocationInfo.PositionMessage)"
