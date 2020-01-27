@@ -158,7 +158,7 @@ function Install-TervisShopifyPowerShellApplication_OrderInterface {
     }
 }
 
-function Install-TervisShopifyPowerShellApplication_PersonalizableItems {
+function Install-TervisShopifyPowerShellApplication_PersonalizableItemListUpload {
     param (
         [Parameter(Mandatory,ValueFromPipelineByPropertyName)]$ComputerName,
         [Parameter(Mandatory,ValueFromPipelineByPropertyName)]
