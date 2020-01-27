@@ -1802,7 +1802,7 @@ function Invoke-TervisShopifyPersonalizableItemListUpload {
     param (
         [Parameter(Mandatory)]$PackagePath
     )
-    Write-EventLog -LogName Shopify -Source "PersonalizableItem Update" -EntryType Information -EventId 1 `
+    Write-EventLog -LogName Shopify -Source "Personalizable Item List Upload" -EntryType Information -EventId 1 `
         -Message "Starting personalizable item upload"
     try {
         Set-Location -Path $PackagePath
@@ -1813,10 +1813,10 @@ function Invoke-TervisShopifyPersonalizableItemListUpload {
         $PatchNumber = npm version patch
         npm publish
         git push origin master
-        Write-EventLog -LogName Shopify -Source "PersonalizableItem Update" -EntryType Information -EventId 1 `
+        Write-EventLog -LogName Shopify -Source "Personalizable Item List Upload" -EntryType Information -EventId 1 `
             -Message "Personalizable item updated to $PatchNumber`n$CommitMessage"
     } catch {
-        Write-EventLog -LogName Shopify -Source "PersonalizableItem Update" -EntryType Error -EventId 2 `
+        Write-EventLog -LogName Shopify -Source "Personalizable Item List Upload" -EntryType Error -EventId 2 `
             -Message "Something went wrong.`nReason:`n$_`n$($_.InvocationInfo.PositionMessage)"
     }
     
