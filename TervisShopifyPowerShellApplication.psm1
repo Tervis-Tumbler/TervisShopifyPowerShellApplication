@@ -1806,7 +1806,7 @@ function Update-TervisShopifyPersonalizableItemNPMPackage {
     $PersonalizableItems | ConvertTo-Json -Compress | Out-File -FilePath "./TervisPersonalizableItems.json" -Force -Encoding utf8
     $CommitMessage = "$(Get-Date -Format 'yyyyMMdd_HHmmss') - $($PersonalizableItems.Count) items"
     git commit -a -m "'$($CommitMessage)'"
-    git push origin master
     npm version patch
     npm publish
+    git push origin master
 }
