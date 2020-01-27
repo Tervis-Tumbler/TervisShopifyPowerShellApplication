@@ -20,12 +20,13 @@ function Install-TervisShopifyPowerShellApplicationLog {
         $LogSources = `
             "Item Interface",
             "Order Interface",
-            "Inventory Interface"
+            "Inventory Interface",
+            "Personalizable Item List Upload"
     }
     process {
         foreach ($Source in $LogSources) {
             try {
-                New-EventLog -ComputerName $ComputerName -LogName $LogName -Source $LogSources -ErrorAction Stop
+                New-EventLog -ComputerName $ComputerName -LogName $LogName -Source $Source -ErrorAction Stop
             } catch [System.InvalidOperationException] {
                 Write-Warning "$Source log already exists."
             }
