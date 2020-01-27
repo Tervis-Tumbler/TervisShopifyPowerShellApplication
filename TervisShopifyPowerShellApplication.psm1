@@ -157,6 +157,60 @@ function Install-TervisShopifyPowerShellApplication_OrderInterface {
     }
 }
 
+function Install-TervisShopifyPowerShellApplication_PersonalizableItems {
+    param (
+        [Parameter(Mandatory,ValueFromPipelineByPropertyName)]$ComputerName,
+        [Parameter(Mandatory,ValueFromPipelineByPropertyName)]
+        [ValidateSet("Delta","Epsilon","Production")]$EnvironmentName
+    )
+    begin {
+        # Set up GitHub
+            # git config --global user.name "Username"
+            # git config --global user.email "Email address"
+            # this is more difficult than expected, just use vscode to setup login
+            
+        # Set up NPM
+            # https://docs.npmjs.com/cli/adduser
+            # npm adduser --global --scope=@tervis
+        $ScheduledTasksCredential = Get-TervisPasswordstatePassword -Guid "eed2bd81-fd47-4342-bd59-b396da75c7ed" -AsCredential
+        # $GithubCredential = Get-TervisPasswordstatePassword -Guid "66dcd073-3c80-43c4-b180-4a1ca81ba06e"
+    }
+    process {
+        Invoke-Command -ComputerName $ComputerName -Credential $ScheduledTasksCredential -ScriptBlock {
+            cd $env:USERPROFILE
+            git clone https://github.com/Tervis-Tumbler/TervisPersonalizableItemsJS
+        }
+        $PowerShellApplicationParameters = @{
+            ComputerName = $ComputerName
+            EnvironmentName = $EnvironmentName
+            ModuleName = "TervisShopifyPowerShellApplication"
+            TervisModuleDependencies = `
+                "WebServicesPowerShellProxyBuilder",
+                "PasswordstatePowershell",
+                "TervisPasswordstatePowershell",
+                "TervisPowerShellJobs",
+                "OracleE-BusinessSuitePowerShell",
+                "TervisOracleE-BusinessSuitePowerShell",
+                "InvokeSQL",
+                "TervisMicrosoft.PowerShell.Utility",
+                "TervisMicrosoft.PowerShell.Security",
+                "ShopifyPowerShell",
+                "TervisShopify",
+                "TervisShopifyPowerShellApplication"
+            NugetDependencies = "Oracle.ManagedDataAccess.Core"
+            ScheduledTaskName = "ShopifyPersonalizedItemListUpdate"
+            RepetitionIntervalName = "EveryDayAt6am"
+            CommandString = @"
+Set-TervisEBSEnvironment -Name $EnvironmentName 2> `$null
+Update-TervisShopifyPersonalizableItemNPMPackage -PackagePath `$env:USERPROFILE\TervisPersonalizableItemsJS
+"@
+            ScheduledTasksCredential = $ScheduledTasksCredential
+        }
+        
+        Install-PowerShellApplication @PowerShellApplicationParameters
+    }
+}
+
 function Get-TervisShopifyEnvironmentShopName {
     param (
         [Parameter(Mandatory)][ValidateSet("Delta","Epsilon","Production")]$Environment
@@ -1749,9 +1803,10 @@ function Update-TervisShopifyPersonalizableItemNPMPackage {
     )
     Set-Location -Path $PackagePath
     $PersonalizableItems = Get-TervisShopifyPersonalizableItems 
-    $PersonalizableItems | ConvertTo-Json -Compress | Out-File -FilePath "./TervisPersonalizableItems.json" -Force
+    $PersonalizableItems | ConvertTo-Json -Compress | Out-File -FilePath "./TervisPersonalizableItems.json" -Force -Encoding utf8
     $CommitMessage = "$(Get-Date -Format 'yyyyMMdd_HHmmss') - $($PersonalizableItems.Count) items"
-    git commit -a -m '$($CommitMessage)'
+    git commit -a -m "'$($CommitMessage)'"
+    git push origin master
     npm version patch
     npm publish
 }
