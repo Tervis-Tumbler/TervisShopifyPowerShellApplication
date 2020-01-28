@@ -1800,24 +1800,31 @@ function Get-TervisShopifyPersonalizableItems {
 
 function Invoke-TervisShopifyPersonalizableItemListUpload {
     param (
-        [Parameter(Mandatory)]$PackagePath
+        [Parameter(Mandatory)]$PackagePath,
+        [Parameter(Mandatory)][ValidateSet("Delta","Epsilon","Production")]$Environment
     )
+    $Branch = switch ($Environment) {
+        "Delta" { "delta"; break }
+        "Epsilon" { "epsilon"; break}
+        "Production" { "master"; break}
+    }
+
     Write-EventLog -LogName Shopify -Source "Personalizable Item List Upload" -EntryType Information -EventId 1 `
         -Message "Starting personalizable item upload"
     try {
         Set-Location -Path $PackagePath
+        git checkout $Branch
         $PersonalizableItems = Get-TervisShopifyPersonalizableItems 
         $PersonalizableItems | ConvertTo-Json -Compress | Out-File -FilePath "./TervisPersonalizableItems.json" -Force -Encoding utf8
         $CommitMessage = "$(Get-Date -Format 'yyyyMMdd_HHmmss') - $($PersonalizableItems.Count) items"
         git commit -a -m "'$($CommitMessage)'"
         $PatchNumber = npm version patch
-        npm publish
-        git push origin master
+        if ($Environment -eq "Production") { npm publish }
+        git push origin $Branch
         Write-EventLog -LogName Shopify -Source "Personalizable Item List Upload" -EntryType Information -EventId 1 `
             -Message "Personalizable item list updated to $PatchNumber`nCommit: '$CommitMessage'"
     } catch {
         Write-EventLog -LogName Shopify -Source "Personalizable Item List Upload" -EntryType Error -EventId 2 `
             -Message "Something went wrong.`nReason:`n$_`n$($_.InvocationInfo.PositionMessage)"
     }
-    
 }
