@@ -203,7 +203,7 @@ function Install-TervisShopifyPowerShellApplication_PersonalizableItemListUpload
             RepetitionIntervalName = "EveryDayAt6am"
             CommandString = @"
 Set-TervisEBSEnvironment -Name $EnvironmentName 2> `$null
-Invoke-TervisShopifyPersonalizableItemListUpload -PackagePath `$env:USERPROFILE\TervisPersonalizableItemsJS
+Invoke-TervisShopifyPersonalizableItemListUpload -PackagePath `$env:USERPROFILE\TervisPersonalizableItemsJS -Environment $EnvironmentName
 "@
             ScheduledTasksCredential = $ScheduledTasksCredential
         }
@@ -458,7 +458,8 @@ function Invoke-TervisShopifyInterfaceOrderImport {
         Write-Progress -Activity "Shopify Order Import Interface" -CurrentOperation "Getting orders from Shopify"
         [array]$ShopifyOrders = Get-TervisShopifyOrdersForImport -ShopName $ShopName
         Write-Progress -Activity "Shopify Order Import Interface" -CurrentOperation "Getting refunds from Shopify"
-        [array]$ShopifyRefunds = Get-TervisShopifyOrdersWithRefundPending -ShopName $ShopName
+        [array]$ShopifyRefunds = Get-TervisShopifyOrdersWithRefundPending -ShopName $ShopName # | # Implement with payments  
+            # Where-Object {$_.transactions.edges.node.gateway -notcontains "exchange-credit"}
         if ($ShopifyOrders.Count -gt 0 -or $ShopifyRefunds.Count -gt 0) {
             Write-EventLog -LogName Shopify -Source "Order Interface" -EntryType Information -EventId 1 `
                 -Message "Starting Shopify order import. Processing $($ShopifyOrders.Count) order(s), $($ShopifyRefunds.Count) refund(s)." 
@@ -749,13 +750,8 @@ function Convert-TervisShopifyOrderToEBSOrderLineHeader {
         [Parameter(Mandatory,ValueFromPipeline)]$Order
     )
     process {
-        # $LocationDefinition = Get-TervisShopifyLocationDefinition -City $Order.physicalLocation.address.city
-        # $OrderId = $Order.id | Get-ShopifyIdFromShopifyGid
-        # $StoreNumber = $LocationDefinition.RMSStoreNumber
-        # $ORIG_SYS_DOCUMENT_REF = "$StoreNumber-$OrderId"
-        # $ORIG_SYS_DOCUMENT_REF = $Order.EBSDocumentReference
-        # $StoreCustomerNumber = $LocationDefinition.CustomerNumber
-
+        $IsPersonalized = $Order | Test-TervisShopifyIsPersonalizedOrder
+        
         [PSCustomObject]@{
             ORDER_SOURCE_ID = "1022" # For use during testing payments
             ORIG_SYS_DOCUMENT_REF = $Order.EBSDocumentReference
