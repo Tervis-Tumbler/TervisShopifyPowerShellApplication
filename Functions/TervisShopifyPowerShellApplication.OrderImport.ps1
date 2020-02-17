@@ -738,3 +738,89 @@ function New-EBSOrderLinePaymentSubquery {
         return $Query
     }
 }
+
+function New-TervisShopifyOrderObject {
+    param (
+        [Parameter(Mandatory,ValueFromPipeline)]$Order
+    )
+    process {
+        $OrderedDate = $Order.createdAt | ConvertTo-TervisShopifyOracleSqlDateString
+        
+        # Initial order object
+        $OrderObject = [PSCustomObject]@{
+            Header = [PSCustomObject]@{
+                ORDER_SOURCE_ID = "'1022'" # For use during testing payments
+                ORDERED_DATE = $OrderedDate
+                ORDER_TYPE = "'Store Order'"
+                SHIP_FROM_ORG = "'ORG'"
+                CUSTOMER_NUMBER = "'${$Order.StoreCustomerNumber}'"
+                BOOKED_FLAG = "'Y'"
+                CREATION_DATE = "sysdate"
+                LAST_UPDATE_DATE = "sysdate"
+                PROCESS_FLAG = "'N'"
+                SOURCE_NAME = "'RMS'"
+                OPERATING_UNIT_NAME = "'Tervis Operating Unit'"
+                CREATED_BY_NAME = "'SHOPIFY'"
+                LAST_UPDATED_BY_NAME = "'SHOPIFY'"
+            }
+            Customer = [PSCustomObject]@{}
+            LineItems = @()
+        }
+        
+        # Order lines conversion, for both sales and refunds
+
+        $LineItemCounter = 0
+        $IsRefund = $Order.id -match "refund"
+        $LineItemType = if ($IsRefund) {"refundLineItems"} else {"lineItems"}
+
+        $OrderObject.LineItems += foreach ($Line in $Order.$LineItemType.edges.node) {
+            $LineItemCounter++
+
+            if ($IsRefund) {
+                $LineType = "Tervis Credit Only Line"
+                $InventoryItem = $Line.lineItem.sku
+                $OrderedQuantity = $Line.quantity * -1
+                $UnitListPrice = $Line.priceSet.shopMoney.amount
+                $UnitSellingPrice = $Line.priceSet.shopMoney.amount
+                $ReturnReasonCode = "STORE RETURN"
+                $TaxValue = $Line.totalTaxSet.shopMoney.amount
+            } else {
+                $LineType = "Tervis Bill Only with Inv Line"
+                $InventoryItem = $Line.sku
+                $OrderedQuantity = $Line.quantity
+                $UnitListPrice = $Line.originalUnitPriceSet.shopMoney.amount
+                $UnitSellingPrice = $Line.discountedUnitPriceSet.shopMoney.amount
+                $TaxValue = $Line.taxLines.priceSet.shopMoney.amount | Measure-Object -Sum | Select-Object -ExpandProperty Sum
+            }
+
+            [PSCustomObject]@{
+                ORDER_SOURCE_ID = "'1022'" # For use during testing payments
+                ORIG_SYS_DOCUMENT_REF = "'${$Order.EBSDocumentReference}'"
+                ORIG_SYS_LINE_REF = "'$OrderLineNumber'"
+                ORIG_SYS_SHIPMENT_REF = ""
+                LINE_TYPE = "'$LineType'"
+                INVENTORY_ITEM = "'$InventoryItem'"
+                ORDERED_QUANTITY = $OrderedQuantity
+                ORDER_QUANTITY_UOM = "'EA'"
+                SHIP_FROM_ORG = "'STO'"
+                UNIT_LIST_PRICE = $UnitListPrice
+                UNIT_SELLING_PRICE = $UnitSellingPrice
+                CALCULATE_PRICE_FLAG = "'P'"
+                RETURN_REASON_CODE = "'$ReturnReasonCode'"
+                CREATION_DATE = $Order.createdAt | ConvertTo-TervisShopifyOracleSqlDateString
+                LAST_UPDATE_DATE = $Order.createdAt | ConvertTo-TervisShopifyOracleSqlDateString
+                SUBINVENTORY = $Order.Subinventory
+                PROCESS_FLAG = "'N'"
+                SOURCE_NAME = "'RMS'"
+                OPERATING_UNIT_NAME = "'Tervis Operating Unit'"
+                CREATED_BY_NAME = "'SHOPIFY'"
+                LAST_UPDATED_BY_NAME = "'SHOPIFY'"
+                # TAX_VALUE = $TaxValue
+                TAX_VALUE = "" # For use in PRD until payments implemented
+
+            }
+        }
+
+        return $OrderObject
+    }
+}
