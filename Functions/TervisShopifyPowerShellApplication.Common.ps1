@@ -91,8 +91,11 @@ INSERT ALL
         $CustomerValues = $CustomerProperties | ForEach-Object {
             $Customer.$_
         }
-        $Query += "INTO xxoe_customer_info_iface_all ($($CustomerProperties -join ","))`n"
-        $Query += "VALUES ($($CustomerValues -join ","))`n"
+        if ($CustomerProperties) {
+            $Query += "INTO xxoe_customer_info_iface_all ($($CustomerProperties -join ","))`n"
+            $Query += "VALUES ($($CustomerValues -join ","))`n"
+        }
+
         # Convert to lines
         foreach ($Line in $LineItems) {
             $LineProperties = $Line | 
@@ -104,6 +107,7 @@ INSERT ALL
             $Query += "INTO xxoe_lines_iface_all ($($LineProperties -join ","))`n"
             $Query += "VALUES ($($LineValues -join ","))`n"
         }
+
         # Convert to payment (later, after personalization/EA)
     }
     end {
