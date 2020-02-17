@@ -753,7 +753,7 @@ function New-TervisShopifyOrderObject {
                 ORDERED_DATE = $OrderedDate
                 ORDER_TYPE = "'Store Order'"
                 SHIP_FROM_ORG = "'ORG'"
-                CUSTOMER_NUMBER = "'${$Order.StoreCustomerNumber}'"
+                CUSTOMER_NUMBER = "'$($Order.StoreCustomerNumber)'"
                 BOOKED_FLAG = "'Y'"
                 CREATION_DATE = "sysdate"
                 LAST_UPDATE_DATE = "sysdate"
@@ -795,9 +795,9 @@ function New-TervisShopifyOrderObject {
 
             [PSCustomObject]@{
                 ORDER_SOURCE_ID = "'1022'" # For use during testing payments
-                ORIG_SYS_DOCUMENT_REF = "'${$Order.EBSDocumentReference}'"
+                ORIG_SYS_DOCUMENT_REF = "'$($Order.EBSDocumentReference)'"
                 ORIG_SYS_LINE_REF = "'$OrderLineNumber'"
-                ORIG_SYS_SHIPMENT_REF = ""
+                ORIG_SYS_SHIPMENT_REF = "''"
                 LINE_TYPE = "'$LineType'"
                 INVENTORY_ITEM = "'$InventoryItem'"
                 ORDERED_QUANTITY = $OrderedQuantity
@@ -809,14 +809,14 @@ function New-TervisShopifyOrderObject {
                 RETURN_REASON_CODE = "'$ReturnReasonCode'"
                 CREATION_DATE = $Order.createdAt | ConvertTo-TervisShopifyOracleSqlDateString
                 LAST_UPDATE_DATE = $Order.createdAt | ConvertTo-TervisShopifyOracleSqlDateString
-                SUBINVENTORY = $Order.Subinventory
+                SUBINVENTORY = "'$($Order.Subinventory)'"
                 PROCESS_FLAG = "'N'"
                 SOURCE_NAME = "'RMS'"
                 OPERATING_UNIT_NAME = "'Tervis Operating Unit'"
                 CREATED_BY_NAME = "'SHOPIFY'"
                 LAST_UPDATED_BY_NAME = "'SHOPIFY'"
                 # TAX_VALUE = $TaxValue
-                TAX_VALUE = "" # For use in PRD until payments implemented
+                TAX_VALUE = "''" # For use in PRD until payments implemented
 
             }
         }
