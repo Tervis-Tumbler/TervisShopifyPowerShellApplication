@@ -50,7 +50,9 @@ function Convert-TervisShopifyCustomAttributesToObject {
     process {
         $Object = [PSCustomObject]::new()
         foreach ($Attribute in $Node.customAttributes) {
-            $Object | Add-Member -MemberType NoteProperty -Name $Attribute.key -Value $Attribute.value -Force
+            if ($Attribute.key) {
+                $Object | Add-Member -MemberType NoteProperty -Name $Attribute.key -Value $Attribute.value -Force
+            }
         }
         return $Object
     }
