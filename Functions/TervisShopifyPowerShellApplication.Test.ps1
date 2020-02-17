@@ -29,3 +29,10 @@ function Get-TervisShopifyPersonalizedTestOrder {
     )
     Get-ShopifyOrders -ShopName $ShopName -QueryString "tag:PTest3" | Get-TervisShopifyOrdersForImport -ShopName $ShopName
 }
+
+function Get-TervisShopifyEndlessAisleTestOrder {
+    param (
+        [Parameter(Mandatory)]$ShopName
+    )
+    Get-ShopifyOrders -ShopName $ShopName -QueryString "tag:ShipTest" | Get-TervisShopifyOrdersForImport -ShopName $ShopName
+}
