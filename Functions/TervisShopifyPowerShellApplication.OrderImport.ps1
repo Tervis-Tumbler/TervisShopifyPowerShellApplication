@@ -796,7 +796,7 @@ function New-TervisShopifyOrderObject {
             [PSCustomObject]@{
                 ORDER_SOURCE_ID = "'1022'" # For use during testing payments
                 ORIG_SYS_DOCUMENT_REF = "'$($Order.EBSDocumentReference)'"
-                ORIG_SYS_LINE_REF = "'$OrderLineNumber'"
+                ORIG_SYS_LINE_REF = "'$LineItemCounter'"
                 ORIG_SYS_SHIPMENT_REF = "''"
                 LINE_TYPE = "'$LineType'"
                 INVENTORY_ITEM = "'$InventoryItem'"
