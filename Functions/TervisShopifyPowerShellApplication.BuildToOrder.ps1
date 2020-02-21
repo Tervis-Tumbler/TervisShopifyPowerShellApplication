@@ -1,28 +1,36 @@
-function Add-TervisShopifyBuildToOrderHeaderProperties {
+function New-TervisShopifyBuildToOrderObject {
     param (
-        [Parameter(Mandatory,ValueFromPipeline)]$OrderObject
+        [Parameter(Mandatory,ValueFromPipeline)]$Order
     )
     process {
-        $OrigSysDocumentRef = "FLX-0000001"
-        $CustomerPONumber = "$OrigSysDocumentRef - HamPerez"
-        # $CustomerPONumber = "'$($OrigSysDocumentRef.Trim("'").Split("-")[1])-$($Order.customer.displayName)'"
-        # 
-        # SHIPPING_METHOD_CODE = "'000001_FEDEX_P_GND'" # this should be a separate function to determine ship method
-        # CUSTOMER_PO_NUMBER = $CustomerPONumber
-        # ORIG_SYS_CUSTOMER_REF = $OrigSysDocumentRef
-        # ORIG_SHIP_ADDRESS_REF = $OrigSysDocumentRef
-        # SHIP_TO_CONTACT_REF = $OrigSysDocumentRef
-        # ATTRIBUTE6 = "'Y'" # Free freight. Get from custom attributes
-        # CUSTOMER_REQUESTED_DATE = "sysdate"
-        # # SHIP_FROM_ORG = "ORG" not in here. Maybe remove from head?
+        $OrderObject = $Order| New-TervisShopifyOrderObjectBase
+        $OrderObject | Add-TervisShopifyBuildToOrderHeaderProperties -Order $Order
+        $OrderObject.Customer = $Order | New-TervisShopifyBuildToOrderCustomerInfo
+        # Next up, create Personalization and Special Order lines
+    }
+}
+
+function Add-TervisShopifyBuildToOrderHeaderProperties {
+    param (
+        [Parameter(Mandatory,ValueFromPipeline)]$OrderObject,
+        [Parameter(Mandatory)]$Order
+    )
+    process {
+        $ShipMethodCode = $Order.CustomerAttributes.shipMethodCode
+        $FreeFreight = $Order.CustomAttributes.freeFreight
+
+        $OrigSysDocumentRef = $OrderObject.Header.ORIG_SYS_DOCUMENT_REF
+        $CustomerPONumber = "'$($OrigSysDocumentRef.Trim("'").Split("-")[1])-$($Order.customer.displayName)'"
+
         $PropertiesToAdd = @{
-            SHIPPING_METHOD_CODE = "'000001_FEDEX_P_GND'" # this should be a separate function to determine ship method
+            SHIPPING_METHOD_CODE = "'$($ShipMethodCode)'" # this should be a separate function to determine ship method
             CUSTOMER_PO_NUMBER = $CustomerPONumber
             ORIG_SYS_CUSTOMER_REF = $OrigSysDocumentRef
             ORIG_SHIP_ADDRESS_REF = $OrigSysDocumentRef
             SHIP_TO_CONTACT_REF = $OrigSysDocumentRef
-            ATTRIBUTE6 = "'Y'" # Free freight. Get from custom attributes
+            ATTRIBUTE6 = "'$($FreeFreight)'" # Free freight. Get from custom attributes
             CUSTOMER_REQUESTED_DATE = "sysdate"
+            # # SHIP_FROM_ORG = "ORG" not in here. Maybe remove from head?
         }
         
         foreach ($Property in $PropertiesToAdd.Keys) {
