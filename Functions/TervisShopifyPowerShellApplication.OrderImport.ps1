@@ -745,65 +745,12 @@ function New-TervisShopifyOrderObject {
     )
     process {
         $OrderedDate = $Order.createdAt | ConvertTo-TervisShopifyOracleSqlDateString
-        $IsSpecialOrder = $Order | Test-TervisShopifySpecialOrder
+        # $IsSpecialOrder = $Order | Test-TervisShopifySpecialOrder
 
         # Initial order object
-        $OrderObject = [PSCustomObject]@{
-            Header = [PSCustomObject]@{
-                ORDER_SOURCE_ID = "'1022'" # For use during testing payments
-                ORIG_SYS_DOCUMENT_REF = "'$($Order.EBSDocumentReference)'"
-                ORDERED_DATE = $OrderedDate
-                ORDER_TYPE = "'Store Order'"
-                SHIP_FROM_ORG = "'ORG'"
-                CUSTOMER_NUMBER = "'$($Order.StoreCustomerNumber)'"
-                ATTRIBUTE6 = "'$($Order.CustomAttributes.freeFreight)'" # Free Freight flag
-                BOOKED_FLAG = "'Y'"
-                CREATION_DATE = "sysdate"
-                LAST_UPDATE_DATE = "sysdate"
-                PROCESS_FLAG = "'N'"
-                SOURCE_NAME = "'RMS'"
-                OPERATING_UNIT_NAME = "'Tervis Operating Unit'"
-                CREATED_BY_NAME = "'SHOPIFY'"
-                LAST_UPDATED_BY_NAME = "'SHOPIFY'"
-            }
-            Customer = [PSCustomObject]@{}
-            LineItems = @()
-        }
-        
-        # Customer information, if special order
-        if ($IsSpecialOrder) {
-            $OrderObject.Customer = [PSCustomObject]@{
-                ORIG_SYS_DOCUMENT_REF = "'$($Order.EBSDocumentReference)'"
-                PARENT_CUSTOMER_REF = "'$($Order.StoreCustomerNumber)'" # Trying with store customer number from order
-                PERSON_FIRST_NAME = "'$($Order.customer.firstName)'"
-                PERSON_LAST_NAME = "'$($Order.customer.lastName)'"
-                ADDRESS1 = "'$($Order.customer.defaultAddress.address1)'"
-                ADDRESS2 = "'$($Order.customer.defaultAddress.address2)'"
-                CITY = "'$($Order.customer.defaultAddress.city)'"
-                STATE = "'$($Order.customer.defaultAddress.province)'"
-                POSTAL_CODE = "'$($Order.customer.defaultAddress.zip)'"
-                COUNTRY = "'$($Order.customer.defaultAddress.countryCodeV2)'"
-                PROCESS_FLAG = "'N'"
-                SOURCE_NAME = "'RMS'"
-                OPERATING_UNIT_NAME = "'Tervis Operating Unit'"
-                CREATED_BY_NAME = "'SHOPIFY'"
-                LAST_UPDATED_BY_NAME = "'SHOPIFY'"
-                CREATION_DATE = "sysdate"
-                # Below only applies to CUSTOMER_TYPE "ORGANIZATION" 
-                PARTY_ID = "360580"
-                CUSTOMER_TYPE = "'ORGANIZATION'"
-                ORGANIZATION_NAME = "'$($Order.customer.displayName)'"
-                CUSTOMER_INFO_TYPE_CODE = "'ADDRESS'"
-                CUSTOMER_INFO_REF = "'$($Order.EBSDocumentReference)'"
-                IS_SHIP_TO_ADDRESS = "'Y'"
-                IS_BILL_TO_ADDRESS = "'N'"
-                FREIGHT_TERMS = "'$($Order.CustomAttributes.freightTerms)'"
-                SHIP_METHOD_CODE = "'$($Order.CustomAttributes.shipMethodCode)'"
-            }
-        }
+        $OrderObject = $Order| New-TervisShopifyOrderObjectBase
 
         # Order lines conversion, for both sales and refunds
-
         $LineItemCounter = 0
         $IsRefund = $Order.id -match "refund"
         $LineItemType = if ($IsRefund) {"refundLineItems"} else {"lineItems"}
@@ -866,13 +813,16 @@ function New-TervisShopifyOrderObject {
     }
 }
 
-function Test-TervisShopifySpecialOrder {
+function Test-TervisShopifyBuildToOrder {
     param (
         [Parameter(Mandatory,ValueFromPipeline)]$Order
     )
     process {
-        # return [bool]$Order.CustomAttributes.isSpecialOrder
-        return $true
+        if ($Order.CustomAttributes.shipMethod -ne "") {
+            return $true
+        } else {
+            return $false
+        }
     }
 }
 
@@ -882,11 +832,43 @@ function Invoke-TervisShopifyLineItemSkuSubstitution {
     )
     process {
         switch ($LineItem.sku) {
+            # Substitutes custom shipping SKU in Shopify with the "FREIGHT" EBS item number
             "Shipping-Standard"     { $NewSKU = "1097271"; break }
             "Shipping-Overnight"    { $NewSKU = "1097271"; break }
             "Shipping-Extended"     { $NewSKU = "1097271"; break }
             Default { $NewSku = $LineItem.sku}
         }
         $LineItem | Add-Member -MemberType NoteProperty -Name sku -Value $NewSKU -Force
+    }
+}
+
+function New-TervisShopifyOrderObjectBase {
+    param (
+        [Parameter(Mandatory,ValueFromPipeline)]$Order
+    )
+    process {
+        $OrderedDate = $Order.createdAt | ConvertTo-TervisShopifyOracleSqlDateString
+    
+        [PSCustomObject]@{
+            Header = [PSCustomObject]@{
+                ORDER_SOURCE_ID = "'1022'" # For use during testing payments
+                ORIG_SYS_DOCUMENT_REF = "'$($Order.EBSDocumentReference)'"
+                ORDERED_DATE = $OrderedDate
+                ORDER_TYPE = "'Store Order'"
+                SHIP_FROM_ORG = "'ORG'"
+                CUSTOMER_NUMBER = "'$($Order.StoreCustomerNumber)'"
+                BOOKED_FLAG = "'Y'"
+                CREATION_DATE = "sysdate"
+                LAST_UPDATE_DATE = "sysdate"
+                PROCESS_FLAG = "'N'"
+                SOURCE_NAME = "'RMS'"
+                OPERATING_UNIT_NAME = "'Tervis Operating Unit'"
+                CREATED_BY_NAME = "'SHOPIFY'"
+                LAST_UPDATED_BY_NAME = "'SHOPIFY'"
+                # Free freight may be needed on original order 
+            }
+            Customer = [PSCustomObject]@{}
+            LineItems = @()
+        }
     }
 }
