@@ -745,15 +745,18 @@ function New-TervisShopifyOrderObject {
     )
     process {
         $OrderedDate = $Order.createdAt | ConvertTo-TervisShopifyOracleSqlDateString
-        
+        $IsSpecialOrder = $Order | Test-TervisShopifySpecialOrder
+
         # Initial order object
         $OrderObject = [PSCustomObject]@{
             Header = [PSCustomObject]@{
                 ORDER_SOURCE_ID = "'1022'" # For use during testing payments
+                ORIG_SYS_DOCUMENT_REF = "'$($Order.EBSDocumentReference)'"
                 ORDERED_DATE = $OrderedDate
                 ORDER_TYPE = "'Store Order'"
                 SHIP_FROM_ORG = "'ORG'"
                 CUSTOMER_NUMBER = "'$($Order.StoreCustomerNumber)'"
+                ATTRIBUTE6 = "'$($Order.CustomAttributes.freeFreight)'" # Free Freight flag
                 BOOKED_FLAG = "'Y'"
                 CREATION_DATE = "sysdate"
                 LAST_UPDATE_DATE = "sysdate"
@@ -767,6 +770,38 @@ function New-TervisShopifyOrderObject {
             LineItems = @()
         }
         
+        # Customer information, if special order
+        if ($IsSpecialOrder) {
+            $OrderObject.Customer = [PSCustomObject]@{
+                ORIG_SYS_DOCUMENT_REF = "'$($Order.EBSDocumentReference)'"
+                PARENT_CUSTOMER_REF = "'$($Order.StoreCustomerNumber)'" # Trying with store customer number from order
+                PERSON_FIRST_NAME = "'$($Order.customer.firstName)'"
+                PERSON_LAST_NAME = "'$($Order.customer.lastName)'"
+                ADDRESS1 = "'$($Order.customer.defaultAddress.address1)'"
+                ADDRESS2 = "'$($Order.customer.defaultAddress.address2)'"
+                CITY = "'$($Order.customer.defaultAddress.city)'"
+                STATE = "'$($Order.customer.defaultAddress.province)'"
+                POSTAL_CODE = "'$($Order.customer.defaultAddress.zip)'"
+                COUNTRY = "'$($Order.customer.defaultAddress.countryCodeV2)'"
+                PROCESS_FLAG = "'N'"
+                SOURCE_NAME = "'RMS'"
+                OPERATING_UNIT_NAME = "'Tervis Operating Unit'"
+                CREATED_BY_NAME = "'SHOPIFY'"
+                LAST_UPDATED_BY_NAME = "'SHOPIFY'"
+                CREATION_DATE = "sysdate"
+                # Below only applies to CUSTOMER_TYPE "ORGANIZATION" 
+                PARTY_ID = "360580"
+                CUSTOMER_TYPE = "'ORGANIZATION'"
+                ORGANIZATION_NAME = "'$($Order.customer.displayName)'"
+                CUSTOMER_INFO_TYPE_CODE = "'ADDRESS'"
+                CUSTOMER_INFO_REF = "'$($Order.EBSDocumentReference)'"
+                IS_SHIP_TO_ADDRESS = "'Y'"
+                IS_BILL_TO_ADDRESS = "'N'"
+                FREIGHT_TERMS = "'$($Order.CustomAttributes.freightTerms)'"
+                SHIP_METHOD_CODE = "'$($Order.CustomAttributes.shipMethodCode)'"
+            }
+        }
+
         # Order lines conversion, for both sales and refunds
 
         $LineItemCounter = 0
@@ -775,6 +810,8 @@ function New-TervisShopifyOrderObject {
 
         $OrderObject.LineItems += foreach ($Line in $Order.$LineItemType.edges.node) {
             $LineItemCounter++
+
+            $Line | Invoke-TervisShopifyLineItemSkuSubstitution
 
             if ($IsRefund) {
                 $LineType = "Tervis Credit Only Line"
@@ -821,6 +858,35 @@ function New-TervisShopifyOrderObject {
             }
         }
 
+        # TODO
+        # - Add payments section
+        # - Add special order functionality
+
         return $OrderObject
+    }
+}
+
+function Test-TervisShopifySpecialOrder {
+    param (
+        [Parameter(Mandatory,ValueFromPipeline)]$Order
+    )
+    process {
+        # return [bool]$Order.CustomAttributes.isSpecialOrder
+        return $true
+    }
+}
+
+function Invoke-TervisShopifyLineItemSkuSubstitution {
+    param (
+        [Parameter(Mandatory,ValueFromPipeline)]$LineItem
+    )
+    process {
+        switch ($LineItem.sku) {
+            "Shipping-Standard"     { $NewSKU = "1097271"; break }
+            "Shipping-Overnight"    { $NewSKU = "1097271"; break }
+            "Shipping-Extended"     { $NewSKU = "1097271"; break }
+            Default { $NewSku = $LineItem.sku}
+        }
+        $LineItem | Add-Member -MemberType NoteProperty -Name sku -Value $NewSKU -Force
     }
 }
