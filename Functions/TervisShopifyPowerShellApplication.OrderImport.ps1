@@ -744,9 +744,6 @@ function New-TervisShopifyOrderObject {
         [Parameter(Mandatory,ValueFromPipeline)]$Order
     )
     process {
-        $OrderedDate = $Order.createdAt | ConvertTo-TervisShopifyOracleSqlDateString
-        # $IsSpecialOrder = $Order | Test-TervisShopifySpecialOrder
-
         # Initial order object
         $OrderObject = $Order| New-TervisShopifyOrderObjectBase
 
