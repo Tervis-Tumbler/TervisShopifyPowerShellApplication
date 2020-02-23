@@ -6,19 +6,12 @@ function New-TervisShopifyBuildToOrderObject {
         $OrderObject = $Order| New-TervisShopifyOrderObjectBase
         $OrderObject | Add-TervisShopifyBuildToOrderHeaderProperties -Order $Order
         $OrderObject.Customer = $Order | New-TervisShopifyBuildToOrderCustomerInfo
-        # Next up, create Personalization and Special Order lines
-        # Add TervisPropterties to all llne items 
-        $Order.lineItems.edges.node | Add-TervisShopifyLineItemProperties
-        # Personalization:
-        $PersonalizationLineItems = $Order | 
-            Select-TervisShopifyOrderPersonalizationLines | 
-            Add-TervisShopifyOrderPersonalizationSKU 
-        # Special Order
-        $SpecialOrderLineItems = $Order | Select-TervisShopifyOrderSpecialOrderLines
-        Write-Warning "Pers"
-        $PersonalizationLineItems
-        Write-Warning "SO"
-        $SpecialOrderLineItems
+        $OrderObject.LineItems = $Order | New-TervisShopifyBuildToOrderLines
+        return $OrderObject
+        # NEXT STEPS:
+        # Create "fork in road" for build to order from main order import process
+        # Test regular order import process
+        # Test with combined special order/ personalized tumblers
     }
 }
 
@@ -84,6 +77,74 @@ function New-TervisShopifyBuildToOrderCustomerInfo {
             FREIGHT_TERMS = "'$($Order.CustomAttributes.freightTerms)'"
             SHIP_METHOD_CODE = "'$($Order.CustomAttributes.shipMethodCode)'"
         }
+    }
+}
+
+function New-TervisShopifyBuildToOrderLines {
+    param (
+        [Parameter(Mandatory,ValueFromPipeline)]$Order
+    )
+    process {
+        # Add TervisPropterties to all llne items 
+        $Order.lineItems.edges.node | Add-TervisShopifyLineItemProperties
+        $CombinedLineItems = @()
+        # Personalization:
+        $CombinedLineItems += $Order | 
+            Select-TervisShopifyOrderPersonalizationLines | 
+            Add-TervisShopifyOrderPersonalizationSKU 
+        # Special Order
+        $CombinedLineItems += $Order | Select-TervisShopifyOrderSpecialOrderLines
+        
+        # Now to make the line item objects
+        $LineCounter = 0
+        $FinalLineItems += foreach ($Line in $CombinedLineItems) {
+            $LineCounter++
+            $CustomerSuppliedProperties = $Line.TervisProperties | New-TervisShopifyCustomerSuppliedProperties
+            if ($Line.TervisProperties.isSpecialOrder -eq "true") {
+                $LineNote = "**Special Order**$($Line.TervisProperties.specialOrderNote)"
+            } else {
+                $LineNote = $CustomerSuppliedProperties.CustomerSuppliedDecorationNote
+            }
+
+            [PSCustomObject]@{
+                # For EBS
+                ORDER_SOURCE_ID = "'1022'"
+                ORIG_SYS_DOCUMENT_REF = $OrigSysDocumentRef
+                ORIG_SYS_LINE_REF = "'$($LineCounter)'"
+                LINE_TYPE = "'Tervis Bill Only with Inv Line'"
+                CREATION_DATE = "sysdate"
+                LAST_UPDATE_DATE = "sysdate"
+                PROCESS_FLAG = "'N'"
+                SOURCE_NAME = "'RMS'"
+                OPERATING_UNIT_NAME = "'Tervis Operating Unit'"
+                CREATED_BY_NAME = "'SHOPIFY'"
+                LAST_UPDATED_BY_NAME = "'SHOPIFY'"
+                
+                # From Shopify
+                INVENTORY_ITEM = "'$($Line.TervisProperties.RelatedLineItemSKU)'"
+                ORDERED_QUANTITY = "$($Line.quantity)"
+                UNIT_SELLING_PRICE = "0" # $Line.discountedUnitPriceSet.shopMoney.amount # Might not be relevant
+                UNIT_LIST_PRICE = "0"
+                
+                SIDE1_FONT = "'$($Line.TervisProperties.Side1FontName)'"
+                SIDE1_COLOR = "'$($Line.TervisProperties.Side1ColorName)'"
+                ATTRIBUTE1 = "'$($CustomerSuppliedProperties.Side1CustomerSupplied)'" # CustomerProvided = PersGrap, Other              
+                SIDE1_TEXT1 = "'$($Line.TervisProperties.Side1Line1 | Invoke-TervisShopifyOracleStringEscapeQuotes)'"
+                SIDE1_TEXT2 = "'$($Line.TervisProperties.Side1Line2 | Invoke-TervisShopifyOracleStringEscapeQuotes)'"
+                SIDE1_TEXT3 = "'$($Line.TervisProperties.Side1Line3 | Invoke-TervisShopifyOracleStringEscapeQuotes)'"
+                
+                SIDE2_FONT = "'$($Line.TervisProperties.FontName)'"
+                SIDE2_COLOR = "'$($Line.TervisProperties.FontColor)'"
+                ATTRIBUTE7 = "'$($CustomerSuppliedProperties.Side2CustomerSupplied)'" # CustomerProvided = PersGrap, Other
+                SIDE2_TEXT1 = "'$($Line.TervisProperties.Side2Line1 | Invoke-TervisShopifyOracleStringEscapeQuotes)'"
+                SIDE2_TEXT2 = "'$($Line.TervisProperties.Side2Line2 | Invoke-TervisShopifyOracleStringEscapeQuotes)'"
+                SIDE2_TEXT3 = "'$($Line.TervisProperties.Side2Line3 | Invoke-TervisShopifyOracleStringEscapeQuotes)'"
+
+                ATTRIBUTE14 = "'$LineNote'"
+            }
+        }
+        
+        return $FinalLineItems
     }
 }
 
