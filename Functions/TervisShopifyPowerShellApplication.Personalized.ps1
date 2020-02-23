@@ -221,10 +221,10 @@ function Add-TervisShopifyOrderPersonalizationSKU {
     )
     process {
         $Price = $PersonalizationLine.originalUnitPriceSet.shopMoney.amount
-        if ($Price -eq "5.0") {
-            $PersonalizationLine | Add-Member -MemberType NoteProperty -Name sku -Value "1154266" -Force
-        } elseif ($Price -eq "7.5") {
-            $PersonalizationLine | Add-Member -MemberType NoteProperty -Name sku -Value "1154269" -Force
+        switch ($Price) {
+            "5.0"   { $SKU = "1154266"; break }
+            "7.5"   { $SKU = "1154269"; break }
         }
+        $PersonalizationLine | Add-Member -MemberType NoteProperty -Name sku -Value $SKU -Force -PassThru
     }
 }
