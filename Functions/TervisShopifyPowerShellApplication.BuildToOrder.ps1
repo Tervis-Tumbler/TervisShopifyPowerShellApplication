@@ -56,10 +56,6 @@ function New-TervisShopifyBuildToOrderCustomerInfo {
         [Parameter(Mandatory,ValueFromPipeline)]$Order
     )
     process {
-
-        # REMEMBER THAT YOU'RE MISSING CUSTOMATTRIBUTES (maybe not, cart customattributes 
-        # may be different from lineitem attributes)
-
         [PSCustomObject]@{
             ORIG_SYS_DOCUMENT_REF = "'$($Order.EBSDocumentReference)'"
             PARENT_CUSTOMER_REF = "'$($Order.StoreCustomerNumber)'" # Trying with store customer number from order
@@ -68,7 +64,7 @@ function New-TervisShopifyBuildToOrderCustomerInfo {
             ADDRESS1 = "'$($Order.customer.defaultAddress.address1)'"
             ADDRESS2 = "'$($Order.customer.defaultAddress.address2)'"
             CITY = "'$($Order.customer.defaultAddress.city)'"
-            STATE = "'$($Order.customer.defaultAddress.province)'"
+            STATE = "'$($Order.customer.defaultAddress.province)'" # This still returns full state name. Check GraphQL query.
             POSTAL_CODE = "'$($Order.customer.defaultAddress.zip)'"
             COUNTRY = "'$($Order.customer.defaultAddress.countryCodeV2)'"
             PROCESS_FLAG = "'N'"
