@@ -28,7 +28,7 @@ function Add-TervisShopifyBuildToOrderHeaderProperties {
         [Parameter(Mandatory)]$Order
     )
     process {
-        $ShipMethodCode = $Order.CustomerAttributes.shipMethodCode
+        $ShipMethodCode = $Order.CustomAttributes.shipMethodCode
         $FreeFreight = $Order.CustomAttributes.freeFreight
 
         $OrigSysDocumentRef = $OrderObject.Header.ORIG_SYS_DOCUMENT_REF
