@@ -7,6 +7,18 @@ function New-TervisShopifyBuildToOrderObject {
         $OrderObject | Add-TervisShopifyBuildToOrderHeaderProperties -Order $Order
         $OrderObject.Customer = $Order | New-TervisShopifyBuildToOrderCustomerInfo
         # Next up, create Personalization and Special Order lines
+        # Add TervisPropterties to all llne items 
+        $Order.lineItems.edges.node | Add-TervisShopifyLineItemProperties
+        # Personalization:
+        $PersonalizationLineItems = $Order | 
+            Select-TervisShopifyOrderPersonalizationLines | 
+            Add-TervisShopifyOrderPersonalizationSKU 
+        # Special Order
+        $SpecialOrderLineItems = $Order | Select-TervisShopifyOrderSpecialOrderLines
+        Write-Warning "Pers"
+        $PersonalizationLineItems
+        Write-Warning "SO"
+        $SpecialOrderLineItems
     }
 }
 
@@ -23,12 +35,12 @@ function Add-TervisShopifyBuildToOrderHeaderProperties {
         $CustomerPONumber = "'$($OrigSysDocumentRef.Trim("'").Split("-")[1])-$($Order.customer.displayName)'"
 
         $PropertiesToAdd = @{
-            SHIPPING_METHOD_CODE = "'$($ShipMethodCode)'" # this should be a separate function to determine ship method
+            SHIPPING_METHOD_CODE = "'$($ShipMethodCode)'"
             CUSTOMER_PO_NUMBER = $CustomerPONumber
             ORIG_SYS_CUSTOMER_REF = $OrigSysDocumentRef
             ORIG_SHIP_ADDRESS_REF = $OrigSysDocumentRef
             SHIP_TO_CONTACT_REF = $OrigSysDocumentRef
-            ATTRIBUTE6 = "'$($FreeFreight)'" # Free freight. Get from custom attributes
+            ATTRIBUTE6 = "'$($FreeFreight)'" 
             CUSTOMER_REQUESTED_DATE = "sysdate"
             # # SHIP_FROM_ORG = "ORG" not in here. Maybe remove from head?
         }
@@ -44,6 +56,10 @@ function New-TervisShopifyBuildToOrderCustomerInfo {
         [Parameter(Mandatory,ValueFromPipeline)]$Order
     )
     process {
+
+        # REMEMBER THAT YOU'RE MISSING CUSTOMATTRIBUTES (maybe not, cart customattributes 
+        # may be different from lineitem attributes)
+
         [PSCustomObject]@{
             ORIG_SYS_DOCUMENT_REF = "'$($Order.EBSDocumentReference)'"
             PARENT_CUSTOMER_REF = "'$($Order.StoreCustomerNumber)'" # Trying with store customer number from order
@@ -72,5 +88,25 @@ function New-TervisShopifyBuildToOrderCustomerInfo {
             FREIGHT_TERMS = "'$($Order.CustomAttributes.freightTerms)'"
             SHIP_METHOD_CODE = "'$($Order.CustomAttributes.shipMethodCode)'"
         }
+    }
+}
+
+function Add-TervisShopifyLineItemProperties {
+    param (
+        [Parameter(Mandatory,ValueFromPipeline)]$LineItem
+    )
+    process {
+        $LineItemProperties = $LineItem | Convert-TervisShopifyCustomAttributesToObject
+        $LineItem | Add-Member -MemberType NoteProperty -Name TervisProperties -Value $LineItemProperties -Force
+    }
+}
+
+function Select-TervisShopifyOrderSpecialOrderLines {
+    param (
+        [Parameter(Mandatory,ValueFromPipeline)]$Order
+    )
+    process {
+        $LineItems = $Order.lineItems.edges.node
+        return $LineItems | Where-Object {$_.TervisProperties.isSpecialOrder -eq "true"}
     }
 }

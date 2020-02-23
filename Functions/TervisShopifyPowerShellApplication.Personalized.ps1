@@ -69,6 +69,7 @@ function New-TervisShopifyCustomerSuppliedProperties {
     }
 }
 
+# Only keeping here for reference. Replacing with New-TervisShopifyBuildToOrderObject
 function New-TervisShopifyPersonalizedObjects {
     param (
         [Parameter(Mandatory,ValueFromPipeline)]$Order
@@ -131,9 +132,8 @@ function New-TervisShopifyPersonalizedObjects {
             LineItems = @()
         }
 
-        $PersonalizationLines = $Order.lineItems.edges.node | 
-            Where-Object name -Match "Personalization for" # This should be updated to look for a specific SKU or something
-        
+        $PersonalizationLines = $Order | Select-TervisShopifyOrderPersonalizationLines
+
         $LineCounter = 0
         $PersonalizedObject.LineItems += foreach ($Line in $PersonalizationLines) {
             $LineCounter++
@@ -197,5 +197,34 @@ function Invoke-TervisShopifyOracleStringEscapeQuotes {
     )
     process {
         $String -replace "'","''"
+    }
+}
+
+# This currently presents a problem where these custom items are taxed by default. Need to try
+# a possible fix, where if I add one item to cart, then add properties, then add a second
+# of the same item, will it just increase the quantity or create a separate item?
+# If it creates a new item with no properties, then I can use this to create personaliazation fee items 
+# in shopify that are non-taxed and keep the unique personalization properties on each.
+function Select-TervisShopifyOrderPersonalizationLines {
+    param (
+        [Parameter(Mandatory,ValueFromPipeline)]$Order
+    )
+    process {
+        $Order.lineItems.edges.node | 
+            Where-Object name -Match "Personalization for" # This should be updated to look for a specific SKU or something
+    }
+}
+
+function Add-TervisShopifyOrderPersonalizationSKU {
+    param (
+        [Parameter(Mandatory,ValueFromPipeline)]$PersonalizationLine
+    )
+    process {
+        $Price = $PersonalizationLine.originalUnitPriceSet.shopMoney.amount
+        if ($Price -eq "5.0") {
+            $PersonalizationLine | Add-Member -MemberType NoteProperty -Name sku -Value "1154266" -Force
+        } elseif ($Price -eq "7.5") {
+            $PersonalizationLine | Add-Member -MemberType NoteProperty -Name sku -Value "1154269" -Force
+        }
     }
 }
