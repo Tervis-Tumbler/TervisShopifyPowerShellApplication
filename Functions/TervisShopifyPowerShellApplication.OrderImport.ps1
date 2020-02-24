@@ -815,7 +815,7 @@ function Test-TervisShopifyBuildToOrder {
         [Parameter(Mandatory,ValueFromPipeline)]$Order
     )
     process {
-        if ($Order.CustomAttributes.shipMethod -ne "") {
+        if ($Order.CustomAttributes.shipMethod -ne $null) {
             return $true
         } else {
             return $false
