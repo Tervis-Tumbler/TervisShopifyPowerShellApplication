@@ -102,14 +102,16 @@ function New-TervisShopifyBuildToOrderLines {
             $CustomerSuppliedProperties = $Line.TervisProperties | New-TervisShopifyCustomerSuppliedProperties
             if ($Line.TervisProperties.isSpecialOrder -eq "true") {
                 $LineNote = "**Special Order**$($Line.TervisProperties.specialOrderNote)"
+                $InventoryItem = $Line.sku
             } else {
                 $LineNote = $CustomerSuppliedProperties.CustomerSuppliedDecorationNote
+                $InventoryItem = $Line.TervisProperties.RelatedLineItemSKU
             }
 
             [PSCustomObject]@{
                 # For EBS
                 ORDER_SOURCE_ID = "'1022'"
-                ORIG_SYS_DOCUMENT_REF = $OrigSysDocumentRef
+                ORIG_SYS_DOCUMENT_REF = "'$($Order.EBSDocumentReference)'"
                 ORIG_SYS_LINE_REF = "'$($LineCounter)'"
                 LINE_TYPE = "'Tervis Bill Only with Inv Line'"
                 CREATION_DATE = "sysdate"
@@ -121,7 +123,7 @@ function New-TervisShopifyBuildToOrderLines {
                 LAST_UPDATED_BY_NAME = "'SHOPIFY'"
                 
                 # From Shopify
-                INVENTORY_ITEM = "'$($Line.TervisProperties.RelatedLineItemSKU)'"
+                INVENTORY_ITEM = "'$InventoryItem'"
                 ORDERED_QUANTITY = "$($Line.quantity)"
                 UNIT_SELLING_PRICE = "0" # $Line.discountedUnitPriceSet.shopMoney.amount # Might not be relevant
                 UNIT_LIST_PRICE = "0"
@@ -165,5 +167,15 @@ function Select-TervisShopifyOrderSpecialOrderLines {
     process {
         $LineItems = $Order.lineItems.edges.node
         return $LineItems | Where-Object {$_.TervisProperties.isSpecialOrder -eq "true"}
+    }
+}
+
+function ConvertTo-TervisShopifyOrderBTO {
+    param (
+        [Parameter(Mandatory,ValueFromPipeline)]$Order
+    )
+    process {
+        $Order.EBSDocumentReference = $Order.EBSDocumentReference + "_BTO"
+        return $Order
     }
 }
