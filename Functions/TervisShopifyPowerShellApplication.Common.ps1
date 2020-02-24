@@ -112,6 +112,6 @@ INSERT ALL
     }
     end {
         $Query += "SELECT 1 FROM DUAL`n"
-        $Query
+        return $Query
     }
 }
