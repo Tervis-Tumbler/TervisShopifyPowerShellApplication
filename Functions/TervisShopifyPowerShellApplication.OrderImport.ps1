@@ -37,6 +37,9 @@ function Invoke-TervisShopifyInterfaceOrderImport {
                 -not $Order.ReceiptMethodId
             ) {throw "Location information incomplete. Please update LocationDefinition.csv."}
             if (-not (Test-TervisShopifyEBSOrderExists -Order $Order)) {
+                <#
+                Original order import process:
+
                 $ConvertedOrderHeader = $Order | Convert-TervisShopifyOrderToEBSOrderLineHeader
                 $ConvertedOrderLines = $Order | Convert-TervisShopifyOrderToEBSOrderLines
                 $ConvertedOrderPayment = $Order | Convert-TervisShopifyPaymentsToEBSPayment -ShopName $ShopName # Need to account for split payments
@@ -44,6 +47,17 @@ function Invoke-TervisShopifyInterfaceOrderImport {
                 $Subqueries += $ConvertedOrderLines | New-EBSOrderLineSubquery
                 # $Subqueries += $ConvertedOrderPayment | New-EBSOrderLinePaymentSubquery # Comment in PRD until payments impleemented
                 $Subqueries | Invoke-EBSSubqueryInsert
+                #>
+
+                # New order import process
+                $EBSQuery = $Order | New-TervisShopifyOrderObject | Convert-TervisShopifyOrderObjectToEBSQuery 
+                Invoke-EBSSQL -SQLCommand $EBSQuery
+            }
+            $IsBTO = $Order | Test-TervisShopifyBuildToOrder
+            if ($IsBTO) {
+                $OrderBTO = $Order | ConvertTo-TervisShopifyOrderBTO
+                $EBSQueryBTO = $OrderBTO | New-TervisShopifyBuildToO$rderObject | Convert-TervisShopifyOrderObjectToEBSQuery
+                Invoke-EBSSQL -SQLCommand $EBSQueryBTO
             }
             $Order | Set-ShopifyOrderTag -ShopName $ShopName -AddTag "ImportedToEBS" | Out-Null
             $OrdersProcessed++
