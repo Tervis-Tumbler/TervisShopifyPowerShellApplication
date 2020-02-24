@@ -56,7 +56,7 @@ function Invoke-TervisShopifyInterfaceOrderImport {
             $IsBTO = $Order | Test-TervisShopifyBuildToOrder
             if ($IsBTO) {
                 $OrderBTO = $Order | ConvertTo-TervisShopifyOrderBTO
-                $EBSQueryBTO = $OrderBTO | New-TervisShopifyBuildToO$rderObject | Convert-TervisShopifyOrderObjectToEBSQuery
+                $EBSQueryBTO = $OrderBTO | New-TervisShopifyBuildToOrderObject | Convert-TervisShopifyOrderObjectToEBSQuery
                 Invoke-EBSSQL -SQLCommand $EBSQueryBTO
             }
             $Order | Set-ShopifyOrderTag -ShopName $ShopName -AddTag "ImportedToEBS" | Out-Null
