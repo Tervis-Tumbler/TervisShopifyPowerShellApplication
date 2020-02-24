@@ -866,7 +866,7 @@ function New-TervisShopifyOrderObjectBase {
                 ORIG_SYS_DOCUMENT_REF = "'$($Order.EBSDocumentReference)'"
                 ORDERED_DATE = $OrderedDate
                 ORDER_TYPE = "'Store Order'"
-                SHIP_FROM_ORG = "'ORG'"
+                # SHIP_FROM_ORG = "'ORG'" # Commenting per drew's suggestion. "It's not a thing"
                 CUSTOMER_NUMBER = "'$($Order.StoreCustomerNumber)'"
                 BOOKED_FLAG = "'Y'"
                 CREATION_DATE = "sysdate"

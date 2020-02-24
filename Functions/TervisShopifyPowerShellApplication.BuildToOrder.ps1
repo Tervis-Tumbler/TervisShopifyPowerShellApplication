@@ -35,11 +35,12 @@ function Add-TervisShopifyBuildToOrderHeaderProperties {
             SHIP_TO_CONTACT_REF = $OrigSysDocumentRef
             ATTRIBUTE6 = "'$($FreeFreight)'" 
             CUSTOMER_REQUESTED_DATE = "sysdate"
+            ORDER_TYPE = "'DTC Sales Order'"
             # # SHIP_FROM_ORG = "ORG" not in here. Maybe remove from head?
         }
         
         foreach ($Property in $PropertiesToAdd.Keys) {
-            $OrderObject.Header | Add-Member -MemberType NoteProperty -Name $Property -Value $PropertiesToAdd[$Property]
+            $OrderObject.Header | Add-Member -MemberType NoteProperty -Name $Property -Value $PropertiesToAdd[$Property] -Force
         }
     }
 }
@@ -89,9 +90,7 @@ function New-TervisShopifyBuildToOrderLines {
         $Order.lineItems.edges.node | Add-TervisShopifyLineItemProperties
         $CombinedLineItems = @()
         # Personalization:
-        $CombinedLineItems += $Order | 
-            Select-TervisShopifyOrderPersonalizationLines | 
-            Add-TervisShopifyOrderPersonalizationSKU 
+        $CombinedLineItems += $Order | Select-TervisShopifyOrderPersonalizationLines
         # Special Order
         $CombinedLineItems += $Order | Select-TervisShopifyOrderSpecialOrderLines
         

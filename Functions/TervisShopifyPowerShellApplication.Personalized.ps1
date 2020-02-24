@@ -225,6 +225,6 @@ function Add-TervisShopifyOrderPersonalizationSKU {
             "5.0"   { $SKU = "1154266"; break }
             "7.5"   { $SKU = "1154269"; break }
         }
-        $PersonalizationLine | Add-Member -MemberType NoteProperty -Name sku -Value $SKU -Force -PassThru
+        $PersonalizationLine | Add-Member -MemberType NoteProperty -Name sku -Value $SKU -Force
     }
 }
