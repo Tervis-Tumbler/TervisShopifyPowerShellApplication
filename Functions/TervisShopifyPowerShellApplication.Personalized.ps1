@@ -228,3 +228,33 @@ function Add-TervisShopifyOrderPersonalizationSKU {
         $PersonalizationLine | Add-Member -MemberType NoteProperty -Name sku -Value $SKU -Force
     }
 }
+
+function Set-TervisShopifyOrderPersonalizedItemNumber {
+    param (
+        [Parameter(Mandatory,ValueFromPipeline)]$Order
+    )
+    process {
+        $PersonalizationLines = $Order | Select-TervisShopifyOrderPersonalizationLines
+        foreach ($PersonalizationLine in $PersonalizationLines) {
+            $CustomAttributes = $PersonalizationLine | Convert-TervisShopifyCustomAttributesToObject
+            $RelatedLineItemSKU = $CustomAttributes.RelatedLineItemSKU
+            $LineItemSource = $Order | Select-TervisShopifyOrderLineItem -SKU $RelatedLineItemSKU
+            $NewLineItem = $LineItemSource | ConvertTo-Json -Depth 10 -Compress  | ConvertFrom-Json
+            $NewLineItem.node.quantity = $PersonalizationLine.quantity
+            $NewLineItem.node.sku = "$($CustomAttributes.RelatedLineItemSKU)P"
+            $Order.lineItems.edges += $NewLineItem
+            $LineItemSource.node.quantity = $LineItemSource.node.quantity - $PersonalizationLine.quantity
+        }
+    }
+}
+
+function Select-TervisShopifyOrderLineItem {
+    param (
+        [Parameter(Mandatory,ValueFromPipeline)]$Order,
+        [Parameter(Mandatory)]$SKU
+        # [Parameter(Mandatory)][ValidateSet("Sale","Refund")]$OrderType
+    )
+    process {
+        return $Order.lineItems.edges | Where-Object {$_.node.sku -eq $SKU}
+    }
+}
