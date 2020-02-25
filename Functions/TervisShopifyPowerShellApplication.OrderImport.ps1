@@ -50,7 +50,7 @@ function Invoke-TervisShopifyInterfaceOrderImport {
                 #>
 
                 # New order import process
-                $EBSQuery = $Order | New-TervisShopifyOrderObject | Convert-TervisShopifyOrderObjectToEBSQuery 
+                $EBSQuery = $Order | New-TervisShopifyOrderObject -ShopName $ShopName | Convert-TervisShopifyOrderObjectToEBSQuery 
                 Invoke-EBSSQL -SQLCommand $EBSQuery
             }
             $IsBTO = $Order | Test-TervisShopifyBuildToOrder
@@ -480,7 +480,7 @@ function Get-TervisShopifyReceiptMethod {
     switch ($PaymentTypeCode) {
         # "CHECK" { $ReceiptMethodId; break } # This is now handled in EBS
         "CASH" { "8001"; break }
-        "CREDIT_CARD" { "11001"; break }
+        "CREDIT_CARD" { "10001"; break } # Per greg, this may change between environments.
         default {""}
 
     }
@@ -755,7 +755,8 @@ function New-EBSOrderLinePaymentSubquery {
 
 function New-TervisShopifyOrderObject {
     param (
-        [Parameter(Mandatory,ValueFromPipeline)]$Order
+        [Parameter(Mandatory,ValueFromPipeline)]$Order,
+        [Parameter(Mandatory)]$ShopName
     )
     process {
         # Initial order object
@@ -763,9 +764,9 @@ function New-TervisShopifyOrderObject {
 
         # Order lines conversion, for both sales and refunds
         $OrderObject.LineItems = $Order | New-TervisShopifyOrderObjectLines
-        # TODO
-        # - Add payments section
-        # - Add special order functionality
+
+        # Order payments conversion
+        $OrderObject.Payments = $Order | New-TervisShopifyOrderObjectPayments -ShopName $ShopName
 
         return $OrderObject
     }
@@ -827,6 +828,7 @@ function New-TervisShopifyOrderObjectBase {
             }
             Customer = [PSCustomObject]@{}
             LineItems = @()
+            Payments = @()
         }
     }
 }
@@ -887,13 +889,70 @@ function New-TervisShopifyOrderObjectLines {
                     OPERATING_UNIT_NAME = "'Tervis Operating Unit'"
                     CREATED_BY_NAME = "'SHOPIFY'"
                     LAST_UPDATED_BY_NAME = "'SHOPIFY'"
-                    # TAX_VALUE = $TaxValue
-                    TAX_VALUE = "''" # For use in PRD until payments implemented
+                    TAX_VALUE = $TaxValue
+                    # TAX_VALUE = "''" # For use in PRD until payments implemented
     
                 }
             }
         }
 
         return $LineItems
+    }
+}
+
+function New-TervisShopifyOrderObjectPayments {
+    param (
+        [Parameter(Mandatory,ValueFromPipeline)]$Order,
+        [Parameter(Mandatory)]$ShopName
+    )
+    process {
+        [array]$Transactions = $Order | Get-ShopifyRestOrderTransactionDetail -ShopName $ShopName
+        
+        foreach ($Transaction in $Transactions) {
+            $ORIG_SYS_DOCUMENT_REF = $Order.EBSDocumentReference
+            $PaymentTypeCode = $Transaction | Get-TervisShopifyPaymentTypeCode
+            $PaymentCollectionEvent = $Transaction | Get-TervisShopifyPaymentCollectionEvent
+            $CreditCardNumber = $Transaction | New-TervisShopifyCCDummyNumber
+            $CreditCardName = $Transaction | New-TervisShopifyCCName
+            $CreditCardCode = if ($Transaction.gateway -eq "shopify_payments") {"UNKNOWN"}
+            $CreditCardApprovalDate = if ($CreditCardNumber) {
+                    $Transaction.processed_at | ConvertTo-TervisShopifyOracleSqlDateString
+                } else {
+                    "''"
+                }
+            # $CheckNumber = if ($PaymentTypeCode -eq "CHECK") {""}
+            # $ReceiptMethodId = Get-TervisShopifyReceiptMethod -ReceiptMethodId $Order.ReceiptMethodId -PaymentTypeCode $PaymentTypeCode # if ($PaymentTypeCode -eq "CHECK") {$Order.ReceiptMethodId}
+            $ReceiptMethodId = Get-TervisShopifyReceiptMethod -PaymentTypeCode $PaymentTypeCode
+
+            [PSCustomObject]@{
+                # ORDER_SOURCE_ID = "1101"
+                ORDER_SOURCE_ID = 1022 # For use during testing payments
+                ORIG_SYS_DOCUMENT_REF = "'$ORIG_SYS_DOCUMENT_REF'"
+                ORIG_SYS_PAYMENT_REF = "'$($Transaction.id)'"
+                PAYMENT_TYPE_CODE = "'$PaymentTypeCode'"
+                PAYMENT_COLLECTION_EVENT = "'$PaymentCollectionEvent'"
+                CREDIT_CARD_NUMBER = "'$CreditCardNumber'"
+                CREDIT_CARD_HOLDER_NAME = "'$CreditCardName'"
+                CREDIT_CARD_CODE = "'$CreditCardCode'"
+                # CREDIT_CARD_CODE = ''
+                CREDIT_CARD_APPROVAL_CODE = "'$($Transaction.authorization)'"
+                CREDIT_CARD_APPROVAL_DATE = "$CreditCardApprovalDate"
+                # CHECK_NUMBER = $CheckNumber
+                PAYMENT_AMOUNT = $Transaction.amount
+                CREATION_DATE = "sysdate"
+                LAST_UPDATE_DATE = "sysdate"
+                CREDIT_CARD_EXPIRATION_MONTH = "'$($Transaction.receipt.payment_method_details.card.exp_month)'"
+                CREDIT_CARD_EXPIRATION_YEAR = "'$($Transaction.receipt.payment_method_details.card.exp_year)'"
+                CREDIT_CARD_PAYMENT_STATUS = "''"
+                PROCESS_FLAG = "'N'"
+                # SOURCE_NAME = 'SPF-OSP'
+                SOURCE_NAME = "'RMS'" # For use during testing payments
+                OPERATING_UNIT_NAME = "'Tervis Operating Unit'"
+                CREATED_BY_NAME = "'SHOPIFY'"
+                LAST_UPDATED_BY_NAME = "'SHOPIFY'"
+                RECEIPT_METHOD_ID = "'$($ReceiptMethodId)'"
+                PAYMENT_TRX_ID = "'$($Transaction.id)'"
+            }
+        }
     }
 }

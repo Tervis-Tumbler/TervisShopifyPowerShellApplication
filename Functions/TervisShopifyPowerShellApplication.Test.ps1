@@ -44,7 +44,8 @@ function Get-TervisShopifyEBSRecord {
   
   $Tables =   "xxoe_headers_iface_all",
               "xxoe_customer_info_iface_all",
-              "xxoe_lines_iface_all"
+              "xxoe_lines_iface_all",
+              "xxoe_payments_iface_all"
 
   foreach ($Table in $Tables) {
     Write-Warning "$Table"

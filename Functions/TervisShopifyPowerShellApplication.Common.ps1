@@ -65,7 +65,8 @@ function Convert-TervisShopifyOrderObjectToEBSQuery {
     param (
         [Parameter(Mandatory,ValueFromPipelineByPropertyName)]$Header,
         [Parameter(Mandatory,ValueFromPipelineByPropertyName)]$Customer,
-        [Parameter(Mandatory,ValueFromPipelineByPropertyName)]$LineItems
+        [Parameter(Mandatory,ValueFromPipelineByPropertyName)]$LineItems,
+        [Parameter(Mandatory,ValueFromPipelineByPropertyName)]$Payments
     )
     begin {
         $Query = @"
@@ -109,6 +110,18 @@ INSERT ALL
         }
 
         # Convert to payment (later, after personalization/EA)
+        foreach ($Payment in $Payments) {
+            $PaymentProperties = $Payment | 
+                Get-Member -MemberType NoteProperty | 
+                Select-Object -ExpandProperty Name
+            $PaymentValues = $PaymentProperties | ForEach-Object {
+                $Payment.$_
+            }
+            if ($Payment) {
+                $Query += "INTO xxoe_payments_iface_all ($($PaymentProperties -join ","))`n"
+                $Query += "VALUES ($($PaymentValues -join ","))`n"
+            }
+        }
     }
     end {
         $Query += "SELECT 1 FROM DUAL`n"
