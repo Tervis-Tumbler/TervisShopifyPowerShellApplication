@@ -104,7 +104,7 @@ function New-TervisShopifyBuildToOrderLines {
                 $InventoryItem = $Line.sku
             } else {
                 $LineNote = $CustomerSuppliedProperties.CustomerSuppliedDecorationNote
-                $InventoryItem = $Line.TervisProperties.RelatedLineItemSKU
+                $InventoryItem = "$($Line.TervisProperties.RelatedLineItemSKU)P"
             }
 
             [PSCustomObject]@{
