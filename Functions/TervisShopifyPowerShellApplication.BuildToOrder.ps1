@@ -8,10 +8,6 @@ function New-TervisShopifyBuildToOrderObject {
         $OrderObject.Customer = $Order | New-TervisShopifyBuildToOrderCustomerInfo
         $OrderObject.LineItems = $Order | New-TervisShopifyBuildToOrderLines
         return $OrderObject
-        # NEXT STEPS:
-        # Create "fork in road" for build to order from main order import process
-        # Test regular order import process
-        # Test with combined special order/ personalized tumblers
     }
 }
 
@@ -23,9 +19,10 @@ function Add-TervisShopifyBuildToOrderHeaderProperties {
     process {
         $ShipMethodCode = $Order.CustomAttributes.shipMethodCode
         $FreeFreight = $Order.CustomAttributes.freeFreight
+        $CustomerName = ("$($Order.CustomAttributes.customerFirstName) $($Order.CustomAttributes.customerLastName)").Trim(" ")
 
         $OrigSysDocumentRef = $OrderObject.Header.ORIG_SYS_DOCUMENT_REF
-        $CustomerPONumber = "'$($OrigSysDocumentRef.Trim("'").Split("-")[1])-$($Order.customer.displayName)'"
+        $CustomerPONumber = "'$($OrigSysDocumentRef.Trim("'").Split("-")[1])-$($CustomerName)'"
 
         $PropertiesToAdd = @{
             SHIPPING_METHOD_CODE = "'$($ShipMethodCode)'"
@@ -36,7 +33,6 @@ function Add-TervisShopifyBuildToOrderHeaderProperties {
             ATTRIBUTE6 = "'$($FreeFreight)'" 
             CUSTOMER_REQUESTED_DATE = "sysdate"
             ORDER_TYPE = "'DTC Sales Order'"
-            # # SHIP_FROM_ORG = "ORG" not in here. Maybe remove from head?
         }
         
         foreach ($Property in $PropertiesToAdd.Keys) {
@@ -50,17 +46,19 @@ function New-TervisShopifyBuildToOrderCustomerInfo {
         [Parameter(Mandatory,ValueFromPipeline)]$Order
     )
     process {
+        $CustomerName = ("$($Order.CustomAttributes.customerFirstName) $($Order.CustomAttributes.customerLastName)").Trim(" ")
+
         [PSCustomObject]@{
             ORIG_SYS_DOCUMENT_REF = "'$($Order.EBSDocumentReference)'"
             PARENT_CUSTOMER_REF = "'$($Order.StoreCustomerNumber)'" # Trying with store customer number from order
-            PERSON_FIRST_NAME = "'$($Order.customer.firstName)'"
-            PERSON_LAST_NAME = "'$($Order.customer.lastName)'"
-            ADDRESS1 = "'$($Order.customer.defaultAddress.address1)'"
-            ADDRESS2 = "'$($Order.customer.defaultAddress.address2)'"
-            CITY = "'$($Order.customer.defaultAddress.city)'"
-            STATE = "'$($Order.customer.defaultAddress.province)'" # This still returns full state name. Check GraphQL query.
-            POSTAL_CODE = "'$($Order.customer.defaultAddress.zip)'"
-            COUNTRY = "'$($Order.customer.defaultAddress.countryCodeV2)'"
+            PERSON_FIRST_NAME = "'$($Order.CustomAttributes.customerFirstName)'"
+            PERSON_LAST_NAME = "'$($Order.CustomAttributes.customerLastName)'"
+            ADDRESS1 = "'$($Order.CustomAttributes.customerAddress1)'"
+            ADDRESS2 = "'$($Order.CustomAttributes.customerAddress2)'"
+            CITY = "'$($Order.CustomAttributes.customerCity)'"
+            STATE = "'$($Order.CustomAttributes.customerState)'" # This still returns full state name. Check GraphQL query.
+            POSTAL_CODE = "'$($Order.CustomAttributes.customerZip)'"
+            COUNTRY = "'$($Order.CustomAttributes.customerCountry)'"
             PROCESS_FLAG = "'N'"
             SOURCE_NAME = "'RMS'"
             OPERATING_UNIT_NAME = "'Tervis Operating Unit'"
@@ -70,7 +68,7 @@ function New-TervisShopifyBuildToOrderCustomerInfo {
             # Below only applies to CUSTOMER_TYPE "ORGANIZATION" 
             PARTY_ID = "360580"
             CUSTOMER_TYPE = "'ORGANIZATION'"
-            ORGANIZATION_NAME = "'$($Order.customer.displayName)'"
+            ORGANIZATION_NAME = "'$CustomerName'"
             CUSTOMER_INFO_TYPE_CODE = "'ADDRESS'"
             CUSTOMER_INFO_REF = "'$($Order.EBSDocumentReference)'"
             IS_SHIP_TO_ADDRESS = "'Y'"
