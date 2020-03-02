@@ -191,15 +191,6 @@ function Test-TervisShopifyIsPersonalizedOrder {
     }
 }
 
-function Invoke-TervisShopifyOracleStringEscapeQuotes {
-    param (
-        [Parameter(ValueFromPipeline)]$String
-    )
-    process {
-        $String -replace "'","''"
-    }
-}
-
 # This currently presents a problem where these custom items are taxed by default. Need to try
 # a possible fix, where if I add one item to cart, then add properties, then add a second
 # of the same item, will it just increase the quantity or create a separate item?

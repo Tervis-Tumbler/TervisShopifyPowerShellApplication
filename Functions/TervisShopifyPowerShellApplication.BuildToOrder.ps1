@@ -128,16 +128,16 @@ function New-TervisShopifyBuildToOrderLines {
                 SIDE1_FONT = "'$($Line.TervisProperties.Side1FontName)'"
                 SIDE1_COLOR = "'$($Line.TervisProperties.Side1ColorName)'"
                 ATTRIBUTE1 = "'$($CustomerSuppliedProperties.Side1CustomerSupplied)'" # CustomerProvided = PersGrap, Other              
-                SIDE1_TEXT1 = "'$($Line.TervisProperties.Side1Line1 | Invoke-TervisShopifyOracleStringEscapeQuotes)'"
-                SIDE1_TEXT2 = "'$($Line.TervisProperties.Side1Line2 | Invoke-TervisShopifyOracleStringEscapeQuotes)'"
-                SIDE1_TEXT3 = "'$($Line.TervisProperties.Side1Line3 | Invoke-TervisShopifyOracleStringEscapeQuotes)'"
+                SIDE1_TEXT1 = "'$($Line.TervisProperties.Side1Line1)'"
+                SIDE1_TEXT2 = "'$($Line.TervisProperties.Side1Line2)'"
+                SIDE1_TEXT3 = "'$($Line.TervisProperties.Side1Line3)'"
                 
                 SIDE2_FONT = "'$($Line.TervisProperties.FontName)'"
                 SIDE2_COLOR = "'$($Line.TervisProperties.FontColor)'"
                 ATTRIBUTE7 = "'$($CustomerSuppliedProperties.Side2CustomerSupplied)'" # CustomerProvided = PersGrap, Other
-                SIDE2_TEXT1 = "'$($Line.TervisProperties.Side2Line1 | Invoke-TervisShopifyOracleStringEscapeQuotes)'"
-                SIDE2_TEXT2 = "'$($Line.TervisProperties.Side2Line2 | Invoke-TervisShopifyOracleStringEscapeQuotes)'"
-                SIDE2_TEXT3 = "'$($Line.TervisProperties.Side2Line3 | Invoke-TervisShopifyOracleStringEscapeQuotes)'"
+                SIDE2_TEXT1 = "'$($Line.TervisProperties.Side2Line1)'"
+                SIDE2_TEXT2 = "'$($Line.TervisProperties.Side2Line2)'"
+                SIDE2_TEXT3 = "'$($Line.TervisProperties.Side2Line3)'"
 
                 ATTRIBUTE14 = "'$LineNote'"
             }
