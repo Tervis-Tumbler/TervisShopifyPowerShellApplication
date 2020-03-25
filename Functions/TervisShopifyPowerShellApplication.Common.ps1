@@ -5,7 +5,7 @@ function Get-TervisShopifyEnvironmentShopName {
 
     switch ($Environment) {
         "Delta" {"DLT-TervisStore"; break}
-        "Epsilon" {"DLT-TervisStore"; break}
+        "Epsilon" {"SIT-TervisStore"; break}
         "Production" {"tervisstore"; break}
         default {throw "Environment not recognized"}
     }
