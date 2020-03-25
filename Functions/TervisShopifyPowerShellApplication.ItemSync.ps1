@@ -10,14 +10,16 @@ function Invoke-TervisShopifyInterfaceItemUpdate {
     $ShopName = Get-TervisShopifyEnvironmentShopName -Environment $Environment
     $Locations = Get-ShopifyLocation -ShopName $ShopName -LocationName *
 
-    $NewRecordCount = Get-TervisShopifyItemStagingTableCount
+    $NewRecords = Get-TervisShopifyItemStagingTableUpdates | ? {$_.ITEM_NUMBER[-1] -ne "P"} # Temporary fix
+    # $NewRecordCount = Get-TervisShopifyItemStagingTableCount
+    $NewRecordCount = $NewRecords.Count # Temporary fix
     if ($NewRecordCount -gt 0) {
         Write-Progress -Activity "Syncing products to Shopify" -CurrentOperation "Getting product records"
         Write-EventLog -LogName Shopify -Source "Item Interface" -EntryType Information -EventId 1 `
             -Message "Starting Shopify sync on $NewRecordCount items." 
         $i = 0
         $isSuccessful = @()
-        $NewRecords = Get-TervisShopifyItemStagingTableUpdates
+        # $NewRecords = Get-TervisShopifyItemStagingTableUpdates # Temporary fix
         $NewRecords | ForEach-Object {
             $i++
             Write-Progress -Activity "Syncing products to Shopify" -Status "$i of $NewRecordCount" `
