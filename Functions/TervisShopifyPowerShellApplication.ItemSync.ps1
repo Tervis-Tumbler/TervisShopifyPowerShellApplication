@@ -10,7 +10,7 @@ function Invoke-TervisShopifyInterfaceItemUpdate {
     $ShopName = Get-TervisShopifyEnvironmentShopName -Environment $Environment
     $Locations = Get-ShopifyLocation -ShopName $ShopName -LocationName *
 
-    $NewRecords = Get-TervisShopifyItemStagingTableUpdates | ? {$_.ITEM_NUMBER[-1] -ne "P"} # Temporary fix
+    [array]$NewRecords = Get-TervisShopifyItemStagingTableUpdates | ? {$_.ITEM_NUMBER[-1] -ne "P"} # Temporary fix
     # $NewRecordCount = Get-TervisShopifyItemStagingTableCount
     $NewRecordCount = $NewRecords.Count # Temporary fix
     if ($NewRecordCount -gt 0) {
