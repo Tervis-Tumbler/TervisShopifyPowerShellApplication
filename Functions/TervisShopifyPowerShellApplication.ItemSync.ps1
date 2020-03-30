@@ -17,21 +17,23 @@ function Invoke-TervisShopifyInterfaceItemUpdate {
         Write-Progress -Activity "Syncing products to Shopify" -CurrentOperation "Getting product records"
         Write-EventLog -LogName Shopify -Source "Item Interface" -EntryType Information -EventId 1 `
             -Message "Starting Shopify sync on $NewRecordCount items." 
-        $i = 0
-        $isSuccessful = @()
         # $NewRecords = Get-TervisShopifyItemStagingTableUpdates # Temporary fix
-        $NewRecords | ForEach-Object {
-            $i++
-            Write-Progress -Activity "Syncing products to Shopify" -Status "$i of $NewRecordCount" `
-                -PercentComplete ($i * 100 / $NewRecordCount) -CurrentOperation "Processing EBS item #$($_.ITEM_NUMBER)" -SecondsRemaining (($NewRecordCount - $i) * 4)
-            $isSuccessful += if ($_.ITEM_STATUS -in "Active","DTCDeplete","Hold","Pending") {
-                $_ | Invoke-TervisShopifyAddOrUpdateProduct -ShopName $ShopName -Locations $Locations
+        $InitializationExpression = "$ScriptRoot\ParallelInitScript.ps1"
+        Start-ParallelWork -Parameters $NewRecords -MaxConcurrentJobs 4 -OptionalParameters $InitializationExpression,$ShopName,$Locations -ScriptBlock {
+            param (
+                $Parameter,
+                $OptionalParameters
+            )
+            & $OptionalParameters[0] 2> $null
+            $ShopName = $OptionalParameters[1]
+            if ($Parameter.ITEM_STATUS -in "Active","DTCDeplete","Hold","Pending") {
+                $Parameter | Invoke-TervisShopifyAddOrUpdateProduct -ShopName $ShopName -Locations $OptionalParameters[2]
             } else {
-                $_ | Invoke-TervisShopifyRemoveProduct -ShopName $ShopName
+                $Parameter | Invoke-TervisShopifyRemoveProduct -ShopName $ShopName
             }
         }
         Write-EventLog -LogName Shopify -Source "Item Interface" -EntryType Information -EventId 1 `
-            -Message "Completed Shopify item sync.`nSuccessful: $($isSuccessful.Where({$_ -eq $true}).count)`nFailed: $($isSuccessful.Where({$_ -eq $false}).count)"
+            -Message "Completed Shopify item sync.`nSuccessful: $($isSuccessful.Where({$Parameter -eq $true}).count)`nFailed: $($isSuccessful.Where({$Parameter -eq $false}).count)"
     }
 }
 

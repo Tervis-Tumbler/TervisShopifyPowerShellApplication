@@ -69,6 +69,15 @@ function Install-TervisShopifyPowerShellApplication_ItemInterface {
         }
         
         Install-PowerShellApplication @PowerShellApplicationParameters
+
+        $PowerShellApplicationParameters.CommandString = @"
+Set-TervisEBSEnvironment -Name $EnvironmentName 2> `$null
+Set-TervisShopifyEnvironment -Environment $EnvironmentName
+"@
+        $PowerShellApplicationParameters.ScriptFileName = "ParallelInitScript.ps1"
+        $PowerShellApplicationParameters.Remove("RepetitionIntervalName")
+        $PowerShellApplicationParameters.Remove("ScheduledTasksCredential")
+        Install-PowerShellApplicationFiles @PowerShellApplicationParameters -ScriptOnly
     }
 }
 
