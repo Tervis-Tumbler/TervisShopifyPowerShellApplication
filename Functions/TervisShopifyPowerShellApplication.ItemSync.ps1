@@ -1,6 +1,7 @@
 function Invoke-TervisShopifyInterfaceItemUpdate {
     param (
-        [Parameter(Mandatory)][ValidateSet("Delta","Epsilon","Production")]$Environment
+        [Parameter(Mandatory)][ValidateSet("Delta","Epsilon","Production")]$Environment,
+        $ScriptRoot
     )
     
     Write-Progress -Activity "Syncing products to Shopify" -CurrentOperation "Setting environment variables"
@@ -18,12 +19,15 @@ function Invoke-TervisShopifyInterfaceItemUpdate {
         Write-EventLog -LogName Shopify -Source "Item Interface" -EntryType Information -EventId 1 `
             -Message "Starting Shopify sync on $NewRecordCount items." 
         # $NewRecords = Get-TervisShopifyItemStagingTableUpdates # Temporary fix
+        $Queues = Split-ArrayIntoArrays -InputObject $NewRecords -NumberOfArrays 4
         $InitializationExpression = "$ScriptRoot\ParallelInitScript.ps1"
-        Start-ParallelWork -Parameters $NewRecords -MaxConcurrentJobs 4 -OptionalParameters $InitializationExpression,$ShopName,$Locations -ScriptBlock {
+        $isSuccessful = @()
+        $isSuccessful += Start-ParallelWork -Parameters $Queues -OptionalParameters $InitializationExpression,$ShopName,$Locations -ShowProgress -ScriptBlock {
             param (
                 $Parameter,
                 $OptionalParameters
             )
+            if (-not $Parameter) {return}
             & $OptionalParameters[0] 2> $null
             $ShopName = $OptionalParameters[1]
             if ($Parameter.ITEM_STATUS -in "Active","DTCDeplete","Hold","Pending") {

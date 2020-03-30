@@ -138,3 +138,19 @@ function Invoke-TervisShopifyOracleStringEscapeQuotes {
         $String -replace "'","''"
     }
 }
+
+function Split-ArrayIntoArrays {
+    param (
+        [Parameter(Mandatory,ValueFromPipeline)][array]$InputObject,
+        [Parameter(Mandatory)][int]$NumberOfArrays
+    )
+    $ParentArray = @()
+    $SubarrayLength = [System.Math]::Ceiling( $InputObject.Count / $NumberOfArrays )
+    $Cursor = 0
+    for ($i = 0; $i -lt $NumberOfArrays; $i++) {
+        [array]$Subarray = $InputObject | Select-Object -First $SubarrayLength -Skip $Cursor
+        $Cursor += $SubarrayLength
+        $ParentArray += ,($Subarray)
+    }
+    return $ParentArray
+}
