@@ -37,7 +37,7 @@ function Invoke-TervisShopifyInterfaceItemUpdate {
             }
         }
         Write-EventLog -LogName Shopify -Source "Item Interface" -EntryType Information -EventId 1 `
-            -Message "Completed Shopify item sync.`nSuccessful: $($isSuccessful.Where({$Parameter -eq $true}).count)`nFailed: $($isSuccessful.Where({$Parameter -eq $false}).count)"
+            -Message "Completed Shopify item sync.`nSuccessful: $($isSuccessful.Where({$_ -eq $true}).count)`nFailed: $($isSuccessful.Where({$_ -eq $false}).count)"
     }
 }
 
