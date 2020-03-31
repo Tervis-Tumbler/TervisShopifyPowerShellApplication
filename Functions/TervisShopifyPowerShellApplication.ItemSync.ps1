@@ -30,11 +30,14 @@ function Invoke-TervisShopifyInterfaceItemUpdate {
             if (-not $Parameter) {return}
             & $OptionalParameters[0] 2> $null
             $ShopName = $OptionalParameters[1]
-            if ($Parameter.ITEM_STATUS -in "Active","DTCDeplete","Hold","Pending") {
-                $Parameter | Invoke-TervisShopifyAddOrUpdateProduct -ShopName $ShopName -Locations $OptionalParameters[2]
-            } else {
-                $Parameter | Invoke-TervisShopifyRemoveProduct -ShopName $ShopName
+            $Result = $Parameter | ForEach-Object {
+                if ($_.ITEM_STATUS -in "Active","DTCDeplete","Hold","Pending") {
+                    $_ | Invoke-TervisShopifyAddOrUpdateProduct -ShopName $ShopName -Locations $OptionalParameters[2]
+                } else {
+                    $_ | Invoke-TervisShopifyRemoveProduct -ShopName $ShopName
+                }
             }
+            return $Result
         }
         Write-EventLog -LogName Shopify -Source "Item Interface" -EntryType Information -EventId 1 `
             -Message "Completed Shopify item sync.`nSuccessful: $($isSuccessful.Where({$_ -eq $true}).count)`nFailed: $($isSuccessful.Where({$_ -eq $false}).count)"
