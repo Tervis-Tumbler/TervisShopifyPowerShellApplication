@@ -765,8 +765,8 @@ function New-TervisShopifyOrderObject {
         # Order lines conversion, for both sales and refunds
         $OrderObject.LineItems = $Order | New-TervisShopifyOrderObjectLines
 
-        # Order payments conversion
-        $OrderObject.Payments = $Order | New-TervisShopifyOrderObjectPayments -ShopName $ShopName
+        # Order payments conversion - Disabled during COVID online store
+        #$OrderObject.Payments = $Order | New-TervisShopifyOrderObjectPayments -ShopName $ShopName
 
         return $OrderObject
     }
