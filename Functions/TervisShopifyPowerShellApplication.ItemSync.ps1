@@ -59,6 +59,7 @@ function Invoke-TervisShopifyAddOrUpdateProduct {
             $FoundShopifyProduct = Find-ShopifyProduct -ShopName $ShopName -SKU $ProductRecord.Item_Number
             if ($FoundShopifyProduct.count -gt 1) {throw "Duplicate items found. Cannot update item number $($ProductRecord.Item_Number)"}
             $NewOrUpdatedProduct = if ($FoundShopifyProduct) {
+                    # Setting InventoryPolicy to DENY only during COVID
                     Update-ShopifyProduct -ShopName $ShopName `
                         -Id $FoundShopifyProduct.id `
                         -Title $Title `
@@ -67,20 +68,21 @@ function Invoke-TervisShopifyAddOrUpdateProduct {
                         -Sku $ProductRecord.ITEM_NUMBER `
                         -VariantGID $FoundShopifyProduct.variants.edges.node.id `
                         -Barcode $ProductRecord.UPC `
-                        # -InventoryPolicy "CONTINUE" ` # Commenting out only during COVID
+                        -InventoryPolicy "DENY" `
                         -Tracked true `
                         -InventoryManagement SHOPIFY `
                         -Price $ProductRecord.ITEM_PRICE `
                         -ImageURL "http://images.tervis.com/is/image/$($ProductRecord.IMAGE_URL)" `
                         -Vendor "Tervis"
                 } else {
+                    # Setting InventoryPolicy to DENY only during COVID
                     New-ShopifyProduct -ShopName $ShopName `
                         -Title $Title `
                         -Description $Description `
                         -Handle $ProductRecord.ITEM_NUMBER `
                         -Sku $ProductRecord.ITEM_NUMBER `
                         -Barcode $ProductRecord.UPC `
-                        # -InventoryPolicy "CONTINUE" ` # Commenting out only during COVID
+                        -InventoryPolicy "DENY" `
                         -Tracked true `
                         -InventoryManagement SHOPIFY `
                         -Price $ProductRecord.ITEM_PRICE `
