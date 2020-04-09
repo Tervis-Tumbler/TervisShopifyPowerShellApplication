@@ -203,9 +203,10 @@ function ConvertFrom-TervisColorCode {
 
 function ConvertTo-ShopifyFriendlyString {
     param (
-        [Parameter(Mandatory,ValueFromPipeline)][string]$String
+        [Parameter(ValueFromPipeline)][string]$String
     )
     process {
+        if (-not $String) {return}
         $CharArray = $String.ToCharArray()
         $StringArray = $CharArray | ForEach-Object {
             $CharValue = [char]::ConvertToUtf32($_.ToString(), 0)
