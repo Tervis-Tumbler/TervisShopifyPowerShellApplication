@@ -9,7 +9,6 @@ function Invoke-TervisShopifyInterfaceItemUpdate {
     Set-TervisShopifyEnvironment -Environment $Environment
 
     $ShopName = Get-TervisShopifyEnvironmentShopName -Environment $Environment
-    $Locations = Get-ShopifyLocation -ShopName $ShopName -LocationName *
 
     [array]$NewRecords = Get-TervisShopifyItemStagingTableUpdates | ? {$_.ITEM_NUMBER[-1] -ne "P"} # Temporary fix
     # $NewRecordCount = Get-TervisShopifyItemStagingTableCount
@@ -22,7 +21,7 @@ function Invoke-TervisShopifyInterfaceItemUpdate {
         $Queues = Split-ArrayIntoArrays -InputObject $NewRecords -NumberOfArrays 4
         $InitializationExpression = "$ScriptRoot\ParallelInitScript.ps1"
         $isSuccessful = @()
-        $isSuccessful += Start-ParallelWork -Parameters $Queues -OptionalParameters $InitializationExpression,$ShopName,$Locations -ShowProgress -ScriptBlock {
+        $isSuccessful += Start-ParallelWork -Parameters $Queues -OptionalParameters $InitializationExpression,$ShopName -ShowProgress -ScriptBlock {
             param (
                 $Parameter,
                 $OptionalParameters
@@ -32,7 +31,7 @@ function Invoke-TervisShopifyInterfaceItemUpdate {
             $ShopName = $OptionalParameters[1]
             $Result = $Parameter | ForEach-Object {
                 if ($_.ITEM_STATUS -in "Active","DTCDeplete","Hold","Pending") {
-                    $_ | Invoke-TervisShopifyAddOrUpdateProduct -ShopName $ShopName -Locations $OptionalParameters[2]
+                    $_ | Invoke-TervisShopifyAddOrUpdateProduct -ShopName $ShopName
                 } else {
                     $_ | Invoke-TervisShopifyRemoveProduct -ShopName $ShopName
                 }
@@ -47,22 +46,28 @@ function Invoke-TervisShopifyInterfaceItemUpdate {
 function Invoke-TervisShopifyAddOrUpdateProduct {
     param (
         [Parameter(Mandatory,ValueFromPipeline)]$ProductRecord,
-        [Parameter(Mandatory)]$Locations,
         [Parameter(Mandatory)]$ShopName
     )
     process {    
         try {
+            if ($ProductRecord.web_primary_name) {
+                $Title = $ProductRecord.web_primary_name | ConvertTo-ShopifyFriendlyString
+                $Description = $ProductRecord.web_secondary_name | ConvertTo-ShopifyFriendlyString
+            } else {
+                $Title = $ProductRecord.ITEM_DESCRIPTION
+            }
             $FoundShopifyProduct = Find-ShopifyProduct -ShopName $ShopName -SKU $ProductRecord.Item_Number
             if ($FoundShopifyProduct.count -gt 1) {throw "Duplicate items found. Cannot update item number $($ProductRecord.Item_Number)"}
             $NewOrUpdatedProduct = if ($FoundShopifyProduct) {
                     Update-ShopifyProduct -ShopName $ShopName `
                         -Id $FoundShopifyProduct.id `
-                        -Title $ProductRecord.ITEM_DESCRIPTION `
+                        -Title $Title `
+                        -Description $Description `
                         -Handle $ProductRecord.ITEM_NUMBER `
                         -Sku $ProductRecord.ITEM_NUMBER `
                         -VariantGID $FoundShopifyProduct.variants.edges.node.id `
                         -Barcode $ProductRecord.UPC `
-                        -InventoryPolicy "CONTINUE" `
+                        # -InventoryPolicy "CONTINUE" ` # Commenting out only during COVID
                         -Tracked true `
                         -InventoryManagement SHOPIFY `
                         -Price $ProductRecord.ITEM_PRICE `
@@ -70,11 +75,12 @@ function Invoke-TervisShopifyAddOrUpdateProduct {
                         -Vendor "Tervis"
                 } else {
                     New-ShopifyProduct -ShopName $ShopName `
-                        -Title $ProductRecord.ITEM_DESCRIPTION `
+                        -Title $Title `
+                        -Description $Description `
                         -Handle $ProductRecord.ITEM_NUMBER `
                         -Sku $ProductRecord.ITEM_NUMBER `
                         -Barcode $ProductRecord.UPC `
-                        -InventoryPolicy "CONTINUE" `
+                        # -InventoryPolicy "CONTINUE" ` # Commenting out only during COVID
                         -Tracked true `
                         -InventoryManagement SHOPIFY `
                         -Price $ProductRecord.ITEM_PRICE `
@@ -84,19 +90,6 @@ function Invoke-TervisShopifyAddOrUpdateProduct {
             # Publish item to POS channel
             $ShopifyRESTProduct = @{id = $NewOrUpdatedProduct.id -replace "[^0-9]"}
             Set-ShopifyRestProductChannel -ShopName $ShopName -Products $ShopifyRESTProduct -Channel global | Out-Null
-            
-            
-            # # Make item available at all locations - not needed, now part of inventory sync
-            # $ShopifyInventoryItemId = $NewOrUpdatedProduct.variants.edges.node.inventoryItem.id -replace "[^0-9]"
-            # $InventoryItemLocations = Get-ShopifyInventoryItemLocations -ShopName $ShopName -InventoryItemId $ShopifyInventoryItemId
-            # $MissingLocationIDs = $Locations | 
-            #     Where-Object Name -NotIn $InventoryItemLocations.Name |
-            #     Select-Object -ExpandProperty id | 
-            #     Get-ShopifyIdFromShopifyGid
-
-            # $MissingLocationIDs | ForEach-Object {
-            #     Invoke-ShopifyInventoryActivate -InventoryItemId $ShopifyInventoryItemId -LocationId $_ -ShopName $ShopName | Out-Null
-            # }
 
             # Write back to EBS staging table
             Set-TervisShopifyItemStagingTableUpdateFlag -EbsItemNumber $NewOrUpdatedProduct.variants.edges.node.inventoryItem.sku
@@ -154,6 +147,8 @@ function Get-TervisShopifyItemStagingTableUpdates {
                 ,price_list_name
                 ,upc
                 ,image_url
+                ,web_primary_name
+                ,web_secondary_name
         FROM xxtrvs.xxtrvs_store_item_price_intf
         WHERE 1 = 1
         AND interfaced_flag = 'N'

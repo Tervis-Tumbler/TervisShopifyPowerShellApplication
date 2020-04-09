@@ -154,3 +154,67 @@ function Split-ArrayIntoArrays {
     }
     return $ParentArray
 }
+
+function ConvertFrom-TervisEBSItemDescription {
+    param (
+        [Parameter(Mandatory,ValueFromPipeline)]$ItemDescription
+    )
+    $SplitDescription = $ItemDescription -split "\."
+    if ($SplitDescription.Count -NE 8) {
+        throw "$ItemDescription does not define all item attributes"
+    }
+    $DisplaySize = "$($SplitDescription[4]) $($SplitDescription[5].ToLower())"
+    # $DisplayCupColor = "Cup: $($SplitDescription[2] | ConvertFrom-TervisColorCode)"
+    # $DisplayLidColor = "Lid: $($SplitDescription[7] | ConvertFrom-TervisColorCode)"
+    # $DisplayUOM 
+
+    return [PSCustomObject]@{
+        Original = $ItemDescription
+        Name = $SplitDescription[0]
+        Form = $SplitDescription[1]
+        CupColor = $SplitDescription[2]
+        Decoration = $SplitDescription[3]
+        SizeValue = $SplitDescription[4]
+        SizeUnit = $SplitDescription[5]
+        UnitOfMeasure = $SplitDescription[6]
+        LidColor = $SplitDescription[7]
+        DisplaySize = $DisplaySize
+    }
+}
+
+function Set-TervisColorCodeDefinition {
+    $ColorCodeURL = "https://unpkg.com/@tervis/tervisproductmetadata/ColorCodeToMarketingNameMapping.json"
+    $Script:ColorCode = Invoke-RestMethod -Uri $ColorCodeURL -Method Get
+}
+
+function ConvertFrom-TervisColorCode {
+    param (
+        [Parameter(Mandatory)]$ColorCode
+    )
+    if ($ColorCodeURL -EQ "NA") {return "N/A"}
+    if (-not $Script:ColorCode) {Set-TervisColorCodeDefinition}
+    $Result = $Script:ColorCode | Where-Object ColorCode -EQ $ColorCode | Select-Object -ExpandProperty MarketingName
+    if ($Result) {
+        return $Result
+    } else {
+        throw "$ColorCode is not a valid color code."
+    }
+}
+
+function ConvertTo-ShopifyFriendlyString {
+    param (
+        [Parameter(Mandatory,ValueFromPipeline)][string]$String
+    )
+    process {
+        $CharArray = $String.ToCharArray()
+        $StringArray = $CharArray | ForEach-Object {
+            $CharValue = [char]::ConvertToUtf32($_.ToString(), 0)
+            if ($CharValue -gt 127) {
+                return "\u{0:x4}" -f $CharValue
+            } else {
+                return $_.ToString()
+            }
+        }
+        return $StringArray -join ""
+    }
+}
