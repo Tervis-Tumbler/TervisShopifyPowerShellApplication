@@ -189,6 +189,9 @@ function Get-TervisShopifyItemsAvailableInEBS {
             ,price_list_name
             ,upc
             ,image_url
+            ,web_primary_name
+            ,web_secondary_name
+            ,design_collection
         FROM xxtrvs.xxtrvs_store_item_price_intf
         WHERE 1 = 1
         AND item_status IN ('Active','DTCDeplete','Hold','Pending')
@@ -222,4 +225,132 @@ function Get-TervisShopifyItemEBSInventoryOnHandQuantityCount {
         AND item_number = '$EBSItemNumber'
 "@
     Invoke-EBSSQL -SQLCommand $Query | Select-Object -ExpandProperty ALLSTOREONHANDQTY
+}
+
+# Online Store stuff
+
+function Invoke-TervisShopifyItemCollectionSync {
+    param (
+        [Parameter(Mandatory)]$ShopName,
+        $Products
+    )
+    if (-not $Products) { $Products = Get-ShopifyRestProductsAll -ShopName $ShopName }
+
+    # Get items from EBS
+    $AvailableItems = Get-TervisShopifyItemsAvailableInEBS
+    $Collections = Get-TervisShopifyEBSDesignCollections
+
+    # Add GIDs to items
+    foreach ($Item in $AvailableItems) {
+        $ShopifyGID = $Products | Where-Object {$_.variants.sku -eq $Item.ITEM_NUMBER} | Select-Object -ExpandProperty admin_graphql_api_id
+        $Item | Add-Member -MemberType NoteProperty -Name ShopifyGID -Value $ShopifyGID
+    }
+    
+    # Add items to collections
+    foreach ($Collection in $Collections) {
+        # Add error checking for null responses
+        $ShopifyCollection = Find-TervisShopifyCollection -ShopName $ShopName -CollectionName $Collection
+        $CollectionItems = $AvailableItems | Where-Object design_collection -eq $Collection
+        Add-TervisShopifyProductToCollection -ShopName $ShopName -ShopifyCollectionGID $ShopifyCollection.id -ShopifyProductGIDs $CollectionItems.ShopifyGID
+    }
+}
+
+function Add-TervisShopifyCollections {
+    param (
+        [Parameter(Mandatory)]$ShopName
+    )
+    $CollectionNames = Get-TervisShopifyEBSDesignCollections
+    foreach ($Collection in $CollectionNames) {
+        $CollectionHandle = $Collection.Replace(" ","-")
+        $Mutation = @"
+            mutation {
+                  collectionCreate(input: {
+                    title: "$Collection"
+                    handle: "$CollectionHandle"
+                  }) {
+                    collection {
+                      id
+                    }
+                    userErrors {
+                      field
+                      message
+                    }
+                  }
+                }
+"@
+        try {
+            $Response = Invoke-ShopifyAPIFunction -ShopName $ShopName -Body $Mutation
+            if ($Response.data.collectionCreate.userErrors) { throw $Response.data.collectionCreate.userErrors.message }
+            if (-not $Response.data.collectionCreate.collection.id) { throw "No Collection ID returned."}
+        } catch {
+            Write-Warning "$Collection`: Could not create collection. $_"
+        }
+        Write-Output "$Collection`: Created successfully."
+    }
+}
+
+function Get-TervisShopifyEBSDesignCollections {
+    $Query = @"
+        SELECT UNIQUE(design_collection)
+        FROM xxtrvs.xxtrvs_store_item_price_intf 
+        WHERE design_collection IS NOT NULL  
+"@
+    Invoke-EBSSQL -SQLCommand $Query | Select-Object -ExpandProperty DESIGN_COLLECTION
+}
+
+function Find-TervisShopifyCollection {
+    param (
+        [Parameter(Mandatory)]$ShopName,
+        [Parameter(Mandatory,ValueFromPipeline)]$CollectionName
+    )
+    $CollectionHandle = $CollectionName.Replace(" ","-")
+    $Query = @"
+        {
+            collectionByHandle(handle:"$CollectionHandle") {
+                id
+            }
+        }
+"@
+    try {
+        $Response = Invoke-ShopifyAPIFunction -ShopName $ShopName -Body $Query
+        return $Response.data.collectionByHandle       
+    } catch {
+        throw $_
+    }
+}
+
+function Add-TervisShopifyProductToCollection {
+    param (
+        [Parameter(Mandatory)]$ShopName,
+        [Parameter(Mandatory)]$ShopifyCollectionGID,
+        [Parameter(Mandatory)][array]$ShopifyProductGIDs
+    )
+    Write-Warning "Collection '$ShopifyCollectionGID' - Adding $($ShopifyProductGIDs.count) products"
+    $ProductLimit = 250
+    for ($i = 0; $i -lt $ShopifyProductGIDs.Count; $i += $ProductLimit) {
+        Write-Warning "Collection '$ShopifyCollectionGID' - Adding $i through $($i + $ProductLimit)"
+        [array]$ProductGIDsToAdd = $ShopifyProductGIDs | Select-Object -First $ProductLimit -Skip $i
+        $JoinedProductGIDs = $ProductGIDsToAdd -join '","'
+        $Mutation = @"
+            mutation {
+                collectionAddProducts(
+                    id: "$ShopifyCollectionGID"
+                    productIds: ["$JoinedProductGIDs"]
+                ) {
+                    collection {
+                        id 
+                    }
+                    userErrors {
+                        field
+                        message
+                    }
+                }
+            }
+"@
+        # try {
+        #     $Response = Invoke-ShopifyAPIFunction -ShopName $ShopName -Body $Mutation
+        # }
+    
+        Invoke-ShopifyAPIFunction -ShopName $ShopName -Body $Mutation
+    }
 }
