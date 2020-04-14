@@ -41,7 +41,7 @@ function Invoke-TervisShopifyInterfaceInventoryUpdate {
             ) {
                 $TimePerStore = Measure-Command { # to measure process per store
                 $InventoryUpdates = Get-TervisShopifyInventoryStagingTableUpdates -SubinventoryCode $Parameter.Subinventory #| select -first 1000
-                $InventoryUpdates | % {if ($_.Subinventory -ne "FL1") {$_.ON_HAND_QTY = 0}} # Temporary COVID update
+                $InventoryUpdates | % {if ($_.SUBINVENTORY_CODE -ne "FL1") {$_.ON_HAND_QTY = 0}} # Temporary COVID update
                 Write-Warning "$($Parameter.Subinventory): Testing InventoryUpdates - Count: $($InventoryUpdates.Count)"
                 #Get current inventory - Get-ShopifyInventoryAtLocation
                 # Measure-Command {
