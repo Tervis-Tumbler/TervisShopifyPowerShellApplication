@@ -310,6 +310,22 @@ function Add-TervisShopifyCollections {
                   collectionCreate(input: {
                     title: "$Collection"
                     handle: "$CollectionHandle"
+                    ruleSet: {
+                        appliedDisjunctively: false
+                        rules: [
+                          {
+                            column: VARIANT_INVENTORY
+                            relation: GREATER_THAN
+                            condition: "0"
+                          },
+                          {
+                            column: TAG
+                            relation: EQUALS
+                            condition: "$Collection"
+                          }
+                        ]
+                      }
+                  
                   }) {
                     collection {
                       id
@@ -325,10 +341,10 @@ function Add-TervisShopifyCollections {
             $Response = Invoke-ShopifyAPIFunction -ShopName $ShopName -Body $Mutation
             if ($Response.data.collectionCreate.userErrors) { throw $Response.data.collectionCreate.userErrors.message }
             if (-not $Response.data.collectionCreate.collection.id) { throw "No Collection ID returned."}
+            Write-Output "$Collection`: Created successfully."
         } catch {
             Write-Warning "$Collection`: Could not create collection. $_"
         }
-        Write-Output "$Collection`: Created successfully."
     }
 }
 
@@ -396,4 +412,33 @@ function Add-TervisShopifyProductToCollection {
     
         Invoke-ShopifyAPIFunction -ShopName $ShopName -Body $Mutation
     }
+}
+
+function Add-TervisShopifyItemCollectionTag {
+    param (
+        [Parameter(Mandatory)]$ShopName,
+        [Parameter(Mandatory)][array]$EBSItemNumbers
+    )
+        $i = 0
+        $total = $EBSItemNumbers.Count
+    foreach ($EBSItemNumber in $EBSItemNumbers) {
+        Write-Progress -Activity "Adding Collection Tags" -CurrentOperation $EBSItemNumber -PercentComplete $($i/$total)
+        try {
+            $Collection = Get-TervisShopifyEBSItem -EBSItemNumber $EBSItemNumber | Select-Object -ExpandProperty DESIGN_COLLECTION
+            $ShopifyGID = Find-ShopifyProduct -SKU $EBSItemNumber -ShopName $ShopName | Select-Object -ExpandProperty id
+            if (-not $ShopifyGID) { throw "Item not on Shopify" }
+            Add-ShopifyTag -ShopName $ShopName -ShopifyGid $ShopifyGID -Tags $Collection
+        } catch { 
+            Write-Warning "$EBSItemNumber`: Could not add tag. Reason: $_"
+        }
+        $i += 100
+    }
+}
+
+function Get-TervisShopifyEBSItem {
+    param (
+        [Parameter(Mandatory)]$EBSItemNumber
+    )
+    $Query = "SELECT * FROM xxtrvs.xxtrvs_store_item_price_intf WHERE item_number = '$EBSItemNumber'"
+    Invoke-EBSSQL $Query
 }
