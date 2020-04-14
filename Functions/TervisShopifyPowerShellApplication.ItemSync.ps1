@@ -232,26 +232,69 @@ function Get-TervisShopifyItemEBSInventoryOnHandQuantityCount {
 function Invoke-TervisShopifyItemCollectionSync {
     param (
         [Parameter(Mandatory)]$ShopName,
-        $Products
+        $Products,
+        $AvailableItems,
+        $ProductsLookupTable,
+        $AvailableItemsWithGID
     )
+    Write-Progress -Activity "Shopify Item Collection Sync" -CurrentOperation "Getting Shopify Products"
     if (-not $Products) { $Products = Get-ShopifyRestProductsAll -ShopName $ShopName }
 
     # Get items from EBS
-    $AvailableItems = Get-TervisShopifyItemsAvailableInEBS
+    Write-Progress -Activity "Shopify Item Collection Sync" -CurrentOperation "Getting Available Items"
+    if (-not $AvailableItems) { $AvailableItems = Get-TervisShopifyItemsAvailableInEBS }
+    Write-Progress -Activity "Shopify Item Collection Sync" -CurrentOperation "Getting Collections"
     $Collections = Get-TervisShopifyEBSDesignCollections
 
-    # Add GIDs to items
-    foreach ($Item in $AvailableItems) {
-        $ShopifyGID = $Products | Where-Object {$_.variants.sku -eq $Item.ITEM_NUMBER} | Select-Object -ExpandProperty admin_graphql_api_id
-        $Item | Add-Member -MemberType NoteProperty -Name ShopifyGID -Value $ShopifyGID
+    # Build lookup table
+    if (-not $ProductsLookupTable) {
+        $i = 0
+        $total = $Products.Count
+        $ProductsLookup = @{}
+        foreach ($Product in $Products) {
+            Write-Progress -Activity "Shopify Item Collection Sync" -CurrentOperation "Creating Product Lookup Table" -PercentComplete $($i/$total) -Status "$($i/100) of $total`: $($Product.title)"
+            $SKU = $Product.variants[0].sku
+            $ProductsLookup.Add($SKU,$Product)
+            $i += 100
+        }
     }
     
+    # Add GIDs to items
+    if (-not $AvailableItemsWithGID) {
+        $i = 0
+        $total = $AvailableItems.Count
+        foreach ($Item in $AvailableItems) {
+            Write-Progress -Activity "Shopify Item Collection Sync" -CurrentOperation "Adding GID to Available Items" -PercentComplete $($i/$total) -Status "Getting GID for $($Item.ITEM_NUMBER)"
+            # $ShopifyGID = $Products | Where-Object {$_.variants[0].sku -eq $Item.ITEM_NUMBER} | Select-Object -ExpandProperty admin_graphql_api_id
+            $ShopifyGID = $ProductsLookupTable[$Item.ITEM_NUMBER].admin_graphql_api_id
+            $i += 50; Write-Progress -Activity "Shopify Item Collection Sync" -CurrentOperation "Adding GID to Available Items" -PercentComplete $($i/$total) "Adding $ShopifyGID to $($Item.ITEM_NUMBER)"
+            $Item | Add-Member -MemberType NoteProperty -Name ShopifyGID -Value $ShopifyGID
+            $i += 50
+        }
+    } else {
+        $AvailableItems = $AvailableItemsWithGID
+    }
+    # $AvailableItems | Export-Clixml -Path .\AvailableItemsWithGID.xml
+
+
+    
     # Add items to collections
+    $i = 0
+    $total = $Collections.Count
     foreach ($Collection in $Collections) {
+        Write-Progress -Activity "Shopify Item Collection Sync" -Status "Finding Shopify Collection" -PercentComplete $($i/$total) -CurrentOperation "Collection: $Collection"
         # Add error checking for null responses
         $ShopifyCollection = Find-TervisShopifyCollection -ShopName $ShopName -CollectionName $Collection
-        $CollectionItems = $AvailableItems | Where-Object design_collection -eq $Collection
-        Add-TervisShopifyProductToCollection -ShopName $ShopName -ShopifyCollectionGID $ShopifyCollection.id -ShopifyProductGIDs $CollectionItems.ShopifyGID
+        $i += 33; Write-Progress -Activity "Shopify Item Collection Sync" -Status "Getting Items belonging to Collection" -PercentComplete $($i/$total) -CurrentOperation "Collection: $Collection"
+        $CollectionItems = $AvailableItems | Where-Object design_collection -eq $Collection | Where-Object ShopifyGID -ne $null # HMM.... there shouldn't be nulls, I think
+        $i += 33; Write-Progress -Activity "Shopify Item Collection Sync" -Status "Generating Add-TervisShopifyProductToCollection argument objects" -PercentComplete $($i/$total) -CurrentOperation "Collection: $Collection"
+        # Add-TervisShopifyProductToCollection -ShopName $ShopName -ShopifyCollectionGID $ShopifyCollection.id -ShopifyProductGIDs $CollectionItems.ShopifyGID
+        @{
+            ShopName = $ShopName
+            ShopifyCollectionGID = $ShopifyCollection.id
+            ShopifyProductGIDs = $CollectionItems.ShopifyGID
+        }
+        $i += 34
     }
 }
 
