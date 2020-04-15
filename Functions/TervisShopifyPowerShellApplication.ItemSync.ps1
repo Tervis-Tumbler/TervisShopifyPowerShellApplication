@@ -54,12 +54,7 @@ function Invoke-TervisShopifyAddOrUpdateProduct {
         try {
             if ($ProductRecord.web_primary_name) {
                 $Title = $ProductRecord.web_primary_name | ConvertTo-ShopifyFriendlyString
-                $SecondaryName = $ProductRecord.web_secondary_name | ConvertTo-ShopifyFriendlyString
-                $DisplaySize = try {
-                    $DescriptionObject = $ProductRecord.ITEM_DESCRIPTION | ConvertFrom-TervisEBSItemDescription
-                    "- $($DescriptionObject.DisplaySize)"
-                } catch { "" }
-                $Description = "$SecondaryName $DisplaySize"
+                $Description = $ProductRecord | New-TervisShopifyItemDescription
             } else {
                 $Title = $ProductRecord.ITEM_DESCRIPTION
             }
@@ -309,7 +304,7 @@ function Add-TervisShopifyCollections {
     param (
         [Parameter(Mandatory)]$ShopName
     )
-    $CollectionNames = Get-TervisShopifyEBSDesignCollections
+    $CollectionNames = Get-TervisShopifySuperCollectionName -Collection *
     foreach ($Collection in $CollectionNames) {
         $CollectionHandle = $Collection.Replace(" ","-")
         $Mutation = @"
@@ -329,6 +324,11 @@ function Add-TervisShopifyCollections {
                             column: TAG
                             relation: EQUALS
                             condition: "$Collection"
+                          },
+                          {
+                            column: TAG
+                            relation: EQUALS
+                            condition: "Online"
                           }
                         ]
                       }
@@ -432,9 +432,10 @@ function Add-TervisShopifyItemCollectionTag {
         Write-Progress -Activity "Adding Collection Tags" -CurrentOperation $EBSItemNumber -PercentComplete $($i/$total)
         try {
             $Collection = Get-TervisShopifyEBSItem -EBSItemNumber $EBSItemNumber | Select-Object -ExpandProperty DESIGN_COLLECTION
+            $SuperCollection = Get-TervisShopifySuperCollectionName -Collection $Collection
             $ShopifyGID = Find-ShopifyProduct -SKU $EBSItemNumber -ShopName $ShopName | Select-Object -ExpandProperty id
             if (-not $ShopifyGID) { throw "Item not on Shopify" }
-            Add-ShopifyTag -ShopName $ShopName -ShopifyGid $ShopifyGID -Tags $Collection,"Online"
+            Add-ShopifyTag -ShopName $ShopName -ShopifyGid $ShopifyGID -Tags $Collection,$SuperCollection,"Online"
         } catch { 
             Write-Warning "$EBSItemNumber`: Could not add tag. Reason: $_"
         }

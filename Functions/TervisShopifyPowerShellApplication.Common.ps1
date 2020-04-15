@@ -159,26 +159,29 @@ function ConvertFrom-TervisEBSItemDescription {
     param (
         [Parameter(Mandatory,ValueFromPipeline)]$ItemDescription
     )
-    $SplitDescription = $ItemDescription -split "\."
-    if ($SplitDescription.Count -NE 8) {
-        throw "$ItemDescription does not define all item attributes"
-    }
-    $DisplaySize = "$($SplitDescription[4]) $($SplitDescription[5].ToLower())"
-    # $DisplayCupColor = "Cup: $($SplitDescription[2] | ConvertFrom-TervisColorCode)"
-    # $DisplayLidColor = "Lid: $($SplitDescription[7] | ConvertFrom-TervisColorCode)"
-    # $DisplayUOM 
-
-    return [PSCustomObject]@{
-        Original = $ItemDescription
-        Name = $SplitDescription[0]
-        Form = $SplitDescription[1]
-        CupColor = $SplitDescription[2]
-        Decoration = $SplitDescription[3]
-        SizeValue = $SplitDescription[4]
-        SizeUnit = $SplitDescription[5]
-        UnitOfMeasure = $SplitDescription[6]
-        LidColor = $SplitDescription[7]
-        DisplaySize = $DisplaySize
+    process {
+        $SplitDescription = $ItemDescription -split "\."
+        if ($SplitDescription.Count -NE 8) {
+            # throw "$ItemDescription does not define all item attributes"
+            return
+        }
+        $DisplaySize = "$($SplitDescription[4]) $($SplitDescription[5].ToLower())"
+        # $DisplayCupColor = "Cup: $($SplitDescription[2] | ConvertFrom-TervisColorCode)"
+        # $DisplayLidColor = "Lid: $($SplitDescription[7] | ConvertFrom-TervisColorCode)"
+        # $DisplayUOM
+    
+        return [PSCustomObject]@{
+            Original = $ItemDescription
+            Name = $SplitDescription[0]
+            Form = $SplitDescription[1]
+            CupColor = $SplitDescription[2]
+            Decoration = $SplitDescription[3]
+            SizeValue = $SplitDescription[4]
+            SizeUnit = $SplitDescription[5]
+            UnitOfMeasure = $SplitDescription[6]
+            LidColor = $SplitDescription[7]
+            DisplaySize = $DisplaySize
+        }
     }
 }
 
