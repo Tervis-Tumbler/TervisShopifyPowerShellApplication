@@ -25,7 +25,7 @@ function Get-TervisShopifyItemDescriptionHTML {
 
     if ($Collection -eq "Accessories") {
         return @"
-<div name="Accessory">
+<div name='Accessory'>
     <p>
         Accessories to complement your Tervis quick sip.
     </p>
@@ -41,7 +41,7 @@ function Get-TervisShopifyItemDescriptionHTML {
 
     if ($DescriptionObject.Form -eq "SS") {
         return @"
-<div name="SS">
+<div name='SS'>
     <p>
         This double-walled tumbler offers all the benefits of stainless steel and can be enjoyed with legendary and
         beloved exclusive Tervis designs.
@@ -63,7 +63,7 @@ function Get-TervisShopifyItemDescriptionHTML {
 
     if ($DescriptionObject.Form -in "WB","DWT","WAV","MUG","WINE","SIP","BEER") {
         return @"
-<div name="Classic">
+<div name='Classic'>
     <p>
         Tervis insulated drinkware delivers the ultimate combination of personality and performance for pure
         drinking enjoyment.
