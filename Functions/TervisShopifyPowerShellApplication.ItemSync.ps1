@@ -323,7 +323,7 @@ function Add-TervisShopifyCollections {
                           {
                             column: VARIANT_INVENTORY
                             relation: GREATER_THAN
-                            condition: "0"
+                            condition: "3"
                           },
                           {
                             column: TAG
@@ -434,7 +434,7 @@ function Add-TervisShopifyItemCollectionTag {
             $Collection = Get-TervisShopifyEBSItem -EBSItemNumber $EBSItemNumber | Select-Object -ExpandProperty DESIGN_COLLECTION
             $ShopifyGID = Find-ShopifyProduct -SKU $EBSItemNumber -ShopName $ShopName | Select-Object -ExpandProperty id
             if (-not $ShopifyGID) { throw "Item not on Shopify" }
-            Add-ShopifyTag -ShopName $ShopName -ShopifyGid $ShopifyGID -Tags $Collection
+            Add-ShopifyTag -ShopName $ShopName -ShopifyGid $ShopifyGID -Tags $Collection,"Online"
         } catch { 
             Write-Warning "$EBSItemNumber`: Could not add tag. Reason: $_"
         }
