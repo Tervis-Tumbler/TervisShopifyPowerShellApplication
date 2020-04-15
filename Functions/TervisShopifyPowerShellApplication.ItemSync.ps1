@@ -54,7 +54,12 @@ function Invoke-TervisShopifyAddOrUpdateProduct {
         try {
             if ($ProductRecord.web_primary_name) {
                 $Title = $ProductRecord.web_primary_name | ConvertTo-ShopifyFriendlyString
-                $Description = $ProductRecord.web_secondary_name | ConvertTo-ShopifyFriendlyString
+                $SecondaryName = $ProductRecord.web_secondary_name | ConvertTo-ShopifyFriendlyString
+                $DisplaySize = try {
+                    $DescriptionObject = $ProductRecord.ITEM_DESCRIPTION | ConvertFrom-TervisEBSItemDescription
+                    "- $($DescriptionObject.DisplaySize)"
+                } catch { "" }
+                $Description = "$SecondaryName $DisplaySize"
             } else {
                 $Title = $ProductRecord.ITEM_DESCRIPTION
             }
