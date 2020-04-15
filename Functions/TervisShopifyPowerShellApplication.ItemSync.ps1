@@ -153,6 +153,7 @@ function Get-TervisShopifyItemStagingTableUpdates {
                 ,image_url
                 ,web_primary_name
                 ,web_secondary_name
+                ,design_collection
         FROM xxtrvs.xxtrvs_store_item_price_intf
         WHERE 1 = 1
         AND interfaced_flag = 'N'
