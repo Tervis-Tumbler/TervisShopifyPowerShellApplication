@@ -30,7 +30,9 @@ function Invoke-TervisShopifyInterfaceItemUpdate {
             & $OptionalParameters[0] 2> $null
             $ShopName = $OptionalParameters[1]
             $Result = $Parameter | ForEach-Object {
-                if ($_.ITEM_STATUS -in "Active","DTCDeplete","Hold","Pending") {
+                if ($_.ITEM_STATUS -in "Active","DTCDeplete","Hold","Pending" -and
+                    $_.WEB_PRIMARY_NAME -and $_.IMAGE_URL # COVID temporary condition
+                ) {
                     $_ | Invoke-TervisShopifyAddOrUpdateProduct -ShopName $ShopName
                 } else {
                     $_ | Invoke-TervisShopifyRemoveProduct -ShopName $ShopName
