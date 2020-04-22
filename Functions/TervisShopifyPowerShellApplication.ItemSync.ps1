@@ -30,9 +30,7 @@ function Invoke-TervisShopifyInterfaceItemUpdate {
             & $OptionalParameters[0] 2> $null
             $ShopName = $OptionalParameters[1]
             $Result = $Parameter | ForEach-Object {
-                if ($_.ITEM_STATUS -in "Active","DTCDeplete","Hold","Pending" -and
-                    $_.WEB_PRIMARY_NAME -and $_.IMAGE_URL # COVID temporary condition
-                ) {
+                if ($_.ITEM_STATUS -in "Active","DTCDeplete","Hold","Pending") {
                     $_ | Invoke-TervisShopifyAddOrUpdateProduct -ShopName $ShopName
                 } else {
                     $_ | Invoke-TervisShopifyRemoveProduct -ShopName $ShopName
@@ -58,6 +56,7 @@ function Invoke-TervisShopifyAddOrUpdateProduct {
             } else {
                 $Title = $ProductRecord.ITEM_DESCRIPTION
             }
+            $IsOnline = if ($ProductRecord.WEB_PRIMARY_NAME -and $ProductRecord.IMAGE_URL) { $true } else { $false }
             $FoundShopifyProduct = Find-ShopifyProduct -ShopName $ShopName -SKU $ProductRecord.Item_Number
             if ($FoundShopifyProduct.count -gt 1) {throw "Duplicate items found. Cannot update item number $($ProductRecord.Item_Number)"}
             $NewOrUpdatedProduct = if ($FoundShopifyProduct) {
@@ -94,6 +93,9 @@ function Invoke-TervisShopifyAddOrUpdateProduct {
             # Publish item to POS channel
             $ShopifyRESTProduct = @{id = $NewOrUpdatedProduct.id -replace "[^0-9]"}
             Set-ShopifyRestProductChannel -ShopName $ShopName -Products $ShopifyRESTProduct -Channel global | Out-Null
+            
+            # Set Online/Offline tags
+            Set-TervisShopifyProductOnlineTag -ShopName $ShopName -ShopifyGID $NewOrUpdatedProduct.id -IsOnline $IsOnline
 
             # Write back to EBS staging table
             Set-TervisShopifyItemStagingTableUpdateFlag -EbsItemNumber $NewOrUpdatedProduct.variants.edges.node.inventoryItem.sku
@@ -106,6 +108,23 @@ function Invoke-TervisShopifyAddOrUpdateProduct {
             return $false
         }
     }
+}
+
+function Set-TervisShopifyProductOnlineTag {
+    param (
+        [Parameter(Mandatory)]$ShopName,
+        [Parameter(Mandatory)]$ShopifyGID,
+        [Parameter(Mandatory)][bool]$IsOnline
+    )
+    if ($IsOnline) {
+        $AddTag = "Online"
+        $RemoveTag = "Offline"
+    } else {
+        $AddTag = "Offline"
+        $RemoveTag = "Online"
+    }
+    Add-ShopifyTag -ShopName $ShopName -ShopifyGid $ShopifyGID -Tags $AddTag
+    Remove-ShopifyTag -ShopName $ShopName -ShopifyGid $ShopifyGID -Tags $RemoveTag
 }
 
 function Invoke-TervisShopifyRemoveProduct {
