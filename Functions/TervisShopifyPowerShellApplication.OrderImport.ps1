@@ -913,7 +913,7 @@ function Add-TervisShopifyShippingLineItem {
         [Parameter(Mandatory,ValueFromPipeline)]$Order
     )
     process {
-        if (-not $Order.IsOnlineOrder -and -not $Order.shippingLine) { return }
+        if (-not $Order.IsOnlineOrder -or -not $Order.shippingLine) { return }
         $Shipping = $Order.shippingLine
         $ShippingNode = [PSCustomObject]@{
             node = [PSCustomObject]@{
