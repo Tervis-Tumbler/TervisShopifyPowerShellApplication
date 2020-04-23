@@ -842,6 +842,8 @@ function New-TervisShopifyOrderObjectLines {
         $IsRefund = $Order.id -match "refund"
         $LineItemType = if ($IsRefund) {"refundLineItems"} else {"lineItems"}
 
+        if (-not $IsRefund) { $Order | Add-TervisShopifyShippingLineItem }
+
         $LineItems += foreach ($Line in $Order.$LineItemType.edges.node) {
             if ($Line.quantity -ne 0) {
 
@@ -896,6 +898,27 @@ function New-TervisShopifyOrderObjectLines {
         }
 
         return $LineItems
+    }
+}
+
+function Add-TervisShopifyShippingLineItem {
+    param (
+        [Parameter(Mandatory,ValueFromPipeline)]$Order
+    )
+    process {
+        if (-not $Order.IsOnlineOrder -and -not $Order.shippingLine) { return }
+        $Shipping = $Order.shippingLine
+        $ShippingNode = [PSCustomObject]@{
+            node = [PSCustomObject]@{
+                name = "FREIGHT"
+                sku = "1097271"
+                quantity = 1
+                originalUnitPriceSet = $Shipping.discountedPriceSet
+                discountedUnitPriceSet = $Shipping.discountedPriceSet
+                taxLines = $Shipping.taxLines
+            }
+        }
+        $Order.lineItems.edges += $ShippingNode
     }
 }
 
