@@ -78,20 +78,27 @@ function Invoke-TervisShopifyInterfaceOrderImport {
                 -not $Refund.Subinventory
             ) {throw "Location information incomplete. Please update LocationDefinition.csv."}
             if (-not (Test-TervisShopifyEBSOrderExists -Order $Refund)) {
+                <# Original refund import process
+
                 $ConvertedRefundHeader = $Refund | Convert-TervisShopifyOrderToEBSOrderLineHeader
                 $ConvertedRefundLines = $Refund | Convert-TervisShopifyRefundToEBSOrderLines
                 [array]$Subqueries = $ConvertedRefundHeader | New-EBSOrderLineHeaderSubquery
                 $Subqueries += $ConvertedRefundLines | New-EBSOrderLineSubquery
                 $Subqueries | Invoke-EBSSubqueryInsert
+                #>
+
+                # New refund import process 
+                $EBSQuery = $Refund | New-TervisShopifyOrderObject -ShopName $ShopName | Convert-TervisShopifyOrderObjectToEBSQuery
+                # Invoke-EBSSQL -SQLCommand $EBSQuery # Commenting until refunds finished
             }
-            $Refund.Order | Set-ShopifyOrderTag -ShopName $ShopName -RemoveTag $Refund.RefundTag -AddTag "RefundProcessed_$($Refund.RefundID)"
+            # $Refund.Order | Set-ShopifyOrderTag -ShopName $ShopName -RemoveTag $Refund.RefundTag -AddTag "RefundProcessed_$($Refund.RefundID)" # Commenting until refunds finished
             $RefundsProcessed++
         } catch {
             Write-EventLog -LogName Shopify -Source "Order Interface" -EntryType Error -EventId 2 `
                 -Message "Something went wrong importing refunds for order #$($Refund.Order.legacyResourceId). Reason:`n$_`n$($_.InvocationInfo.PositionMessage)" 
         }
     }
-    Invoke-TervisShopifyRefundPendingTagCleanup -ShopName $ShopName
+    # Invoke-TervisShopifyRefundPendingTagCleanup -ShopName $ShopName # Commenting until refunds finished
     if ($ShopifyOrders.Count -gt 0 -or $ShopifyRefunds.Count -gt 0) {
         Write-EventLog -LogName Shopify -Source "Order Interface" -EntryType Information -EventId 1 `
                 -Message "Finished Shopify order import. Processed $OrdersProcessed order(s). Processed $RefundsProcessed refund(s)."
