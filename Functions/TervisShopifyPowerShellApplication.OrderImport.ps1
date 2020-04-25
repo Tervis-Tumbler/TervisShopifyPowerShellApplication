@@ -12,12 +12,9 @@ function Invoke-TervisShopifyInterfaceOrderImport {
     try {
         Write-Progress -Activity "Shopify Order Import Interface" -CurrentOperation "Getting orders from Shopify"
         [array]$ShopifyOrders = Get-TervisShopifyOrdersForImport -ShopName $ShopName
-        Write-Progress -Activity "Shopify Order Import Interface" -CurrentOperation "Getting refunds from Shopify"
-        [array]$ShopifyRefunds = Get-TervisShopifyOrdersWithRefundPending -ShopName $ShopName # | # Implement with payments  
-            # Where-Object {$_.transactions.edges.node.gateway -notcontains "exchange-credit"}
-        if ($ShopifyOrders.Count -gt 0 -or $ShopifyRefunds.Count -gt 0) {
+        if ($ShopifyOrders.Count -gt 0) {
             Write-EventLog -LogName Shopify -Source "Order Interface" -EntryType Information -EventId 1 `
-                -Message "Starting Shopify order import. Processing $($ShopifyOrders.Count) order(s), $($ShopifyRefunds.Count) refund(s)." 
+                -Message "Starting Shopify order import. Processing $($ShopifyOrders.Count) order(s)." 
         }
     } catch {
         Write-EventLog -LogName Shopify -Source "Order Interface" -EntryType Error -EventId 2 `
@@ -56,8 +53,10 @@ function Invoke-TervisShopifyInterfaceOrderImport {
             $IsBTO = $Order | Test-TervisShopifyBuildToOrder
             if ($IsBTO) {
                 $OrderBTO = $Order | ConvertTo-TervisShopifyOrderBTO
-                $EBSQueryBTO = $OrderBTO | New-TervisShopifyBuildToOrderObject | Convert-TervisShopifyOrderObjectToEBSQuery
-                Invoke-EBSSQL -SQLCommand $EBSQueryBTO
+                if (-not (Test-TervisShopifyEBSOrderExists -Order $OrderBTO)) {
+                    $EBSQueryBTO = $OrderBTO | New-TervisShopifyBuildToOrderObject | Convert-TervisShopifyOrderObjectToEBSQuery
+                    Invoke-EBSSQL -SQLCommand $EBSQueryBTO
+                }
             }
             $Order | Set-ShopifyOrderTag -ShopName $ShopName -AddTag "ImportedToEBS" | Out-Null
             $OrdersProcessed++
@@ -66,6 +65,21 @@ function Invoke-TervisShopifyInterfaceOrderImport {
                 -Message "Something went wrong importing Shopify order #$($Order.legacyResourceId). Reason:`n$_`n$($_.InvocationInfo.PositionMessage)" 
         }
     }
+
+    try {
+        Write-Progress -Activity "Shopify Order Import Interface" -CurrentOperation "Getting refunds from Shopify"
+        [array]$ShopifyRefunds = Get-TervisShopifyOrdersWithRefundPending -ShopName $ShopName # | # Implement with payments  
+            # Where-Object {$_.transactions.edges.node.gateway -notcontains "exchange-credit"}
+        if ($ShopifyRefunds.Count -gt 0) {
+            Write-EventLog -LogName Shopify -Source "Order Interface" -EntryType Information -EventId 1 `
+                -Message "Starting Shopify refund import. Processing $($ShopifyRefunds.Count) refund(s)." 
+        }
+    } catch {
+        Write-EventLog -LogName Shopify -Source "Order Interface" -EntryType Error -EventId 2 `
+        -Message "Something went wrong. Reason:`n$_`n$($_.InvocationInfo.PositionMessage)" 
+            $_
+    }
+
     $i = 0
     $RefundsProcessed = 0
     foreach ($Refund in $ShopifyRefunds) {
@@ -77,7 +91,9 @@ function Invoke-TervisShopifyInterfaceOrderImport {
                 -not $Refund.StoreCustomerNumber -or
                 -not $Refund.Subinventory
             ) {throw "Location information incomplete. Please update LocationDefinition.csv."}
-            if (-not (Test-TervisShopifyEBSOrderExists -Order $Refund)) {
+            if (
+                -not (Test-TervisShopifyEBSOrderExists -Order $Refund) -and $Refund.refundLineItems.edges[0]
+            ) {
                 <# Original refund import process
 
                 $ConvertedRefundHeader = $Refund | Convert-TervisShopifyOrderToEBSOrderLineHeader
@@ -89,16 +105,16 @@ function Invoke-TervisShopifyInterfaceOrderImport {
 
                 # New refund import process 
                 $EBSQuery = $Refund | New-TervisShopifyOrderObject -ShopName $ShopName | Convert-TervisShopifyOrderObjectToEBSQuery
-                # Invoke-EBSSQL -SQLCommand $EBSQuery # Commenting until refunds finished
+                Invoke-EBSSQL -SQLCommand $EBSQuery 
             }
-            # $Refund.Order | Set-ShopifyOrderTag -ShopName $ShopName -RemoveTag $Refund.RefundTag -AddTag "RefundProcessed_$($Refund.RefundID)" # Commenting until refunds finished
+            $Refund.Order | Set-ShopifyOrderTag -ShopName $ShopName -RemoveTag $Refund.RefundTag -AddTag "RefundProcessed_$($Refund.RefundID)"
             $RefundsProcessed++
         } catch {
             Write-EventLog -LogName Shopify -Source "Order Interface" -EntryType Error -EventId 2 `
                 -Message "Something went wrong importing refunds for order #$($Refund.Order.legacyResourceId). Reason:`n$_`n$($_.InvocationInfo.PositionMessage)" 
         }
     }
-    # Invoke-TervisShopifyRefundPendingTagCleanup -ShopName $ShopName # Commenting until refunds finished
+    Invoke-TervisShopifyRefundPendingTagCleanup -ShopName $ShopName
     if ($ShopifyOrders.Count -gt 0 -or $ShopifyRefunds.Count -gt 0) {
         Write-EventLog -LogName Shopify -Source "Order Interface" -EntryType Information -EventId 1 `
                 -Message "Finished Shopify order import. Processed $OrdersProcessed order(s). Processed $RefundsProcessed refund(s)."
@@ -850,6 +866,11 @@ function New-TervisShopifyOrderObjectLines {
         $LineItemType = if ($IsRefund) {"refundLineItems"} else {"lineItems"}
 
         if (-not $IsRefund) { $Order | Add-TervisShopifyShippingLineItem }
+        # Revisit this when adding refund value to EBS
+        # else {
+        #     $Order | Set-TervisShopifyRefundLineItemPricesToZero
+        #     $Order | Add-TervisShopifyTotalRefundSetLineItem
+        # }
 
         $LineItems += foreach ($Line in $Order.$LineItemType.edges.node) {
             if ($Line.quantity -ne 0) {
@@ -865,7 +886,8 @@ function New-TervisShopifyOrderObjectLines {
                     $UnitListPrice = $Line.priceSet.shopMoney.amount
                     $UnitSellingPrice = $Line.priceSet.shopMoney.amount
                     $ReturnReasonCode = "STORE RETURN"
-                    $TaxValue = $Line.totalTaxSet.shopMoney.amount
+                    # $TaxValue = $Line.totalTaxSet.shopMoney.amount
+                    $TaxValue = 0 # For refunds only, since tax is included in totalRefundSet
                 } else {
                     $LineType = "Tervis Bill Only with Inv Line"
                     $InventoryItem = $Line.sku
@@ -897,8 +919,8 @@ function New-TervisShopifyOrderObjectLines {
                     OPERATING_UNIT_NAME = "'Tervis Operating Unit'"
                     CREATED_BY_NAME = "'SHOPIFY'"
                     LAST_UPDATED_BY_NAME = "'SHOPIFY'"
-                    TAX_VALUE = $TaxValue
-                    # TAX_VALUE = "''" # For use in PRD until payments implemented
+                    # TAX_VALUE = $TaxValue
+                    TAX_VALUE = "''" # For use in PRD until payments implemented
     
                 }
             }
@@ -926,6 +948,41 @@ function Add-TervisShopifyShippingLineItem {
             }
         }
         $Order.lineItems.edges += $ShippingNode
+    }
+}
+
+function Set-TervisShopifyRefundLineItemPricesToZero {
+    param (
+        [Parameter(Mandatory,ValueFromPipeline)]$Refund
+    )
+    process {
+        foreach ($Node in $Refund.refundLineItems.edges.node) {
+            $Node.priceSet.shopMoney.amount = 0
+        }
+    }
+}
+
+function Add-TervisShopifyTotalRefundSetLineItem {
+    param (
+        [Parameter(Mandatory,ValueFromPipeline)]$Refund
+    )
+    process {
+        $TotalRefundSetNode = [PSCustomObject]@{
+            node = [PSCustomObject]@{
+                lineItem = [PSCustomObject]@{
+                    sku = "1097269" # Random miscellaneous item sku
+                }
+                priceSet = $Refund.totalRefundedSet
+                quantity = 1
+                # totalTaxSet here may be okay as zero. Need to revisit when implementing payments.
+                totalTaxSet = [PSCustomObject]@{
+                    shopMoney = [PSCustomObject]@{
+                        amount = 0 
+                    }
+                }
+            }
+        }
+        $Refund.refundLineItems.edges += $TotalRefundSetNode
     }
 }
 
