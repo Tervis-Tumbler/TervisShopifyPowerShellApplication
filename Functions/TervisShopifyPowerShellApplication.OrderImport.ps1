@@ -450,7 +450,7 @@ function Get-TervisShopifyPaymentTypeCode {
         switch ($Transaction.gateway) {
             "cash" { "CHECK"; break }
             "shopify_payments" { "CREDIT_CARD"; break }
-            "gift_card" { "CASH"; break } # Pending. Need to see if this is the correct gateway.
+            "Givex" { "CASH"; break } 
             default { "UNKNOWN" }
         }
     }
@@ -919,8 +919,8 @@ function New-TervisShopifyOrderObjectLines {
                     OPERATING_UNIT_NAME = "'Tervis Operating Unit'"
                     CREATED_BY_NAME = "'SHOPIFY'"
                     LAST_UPDATED_BY_NAME = "'SHOPIFY'"
-                    # TAX_VALUE = $TaxValue
-                    TAX_VALUE = "''" # For use in PRD until payments implemented
+                    TAX_VALUE = $TaxValue
+                    # TAX_VALUE = "''" # For use in PRD until payments implemented
     
                 }
             }
