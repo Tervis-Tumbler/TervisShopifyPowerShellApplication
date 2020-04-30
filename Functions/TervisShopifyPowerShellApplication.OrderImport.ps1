@@ -789,7 +789,7 @@ function New-TervisShopifyOrderObject {
         $OrderObject.LineItems = $Order | New-TervisShopifyOrderObjectLines
 
         # Order payments conversion - Disabled during COVID online store
-        #$OrderObject.Payments = $Order | New-TervisShopifyOrderObjectPayments -ShopName $ShopName
+        $OrderObject.Payments = $Order | New-TervisShopifyOrderObjectPayments -ShopName $ShopName
 
         return $OrderObject
     }
