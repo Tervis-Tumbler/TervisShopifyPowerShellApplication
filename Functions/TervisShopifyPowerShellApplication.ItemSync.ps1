@@ -15,7 +15,7 @@ function Invoke-TervisShopifyInterfaceItemUpdate {
     $NewRecordCount = $NewRecords.Count # Temporary fix
     if ($NewRecordCount -gt 0) {
         Write-Progress -Activity "Syncing products to Shopify" -CurrentOperation "Getting product records"
-        Write-EventLog -LogName Shopify -Source "Item Interface" -EntryType Information -EventId 1 `
+        Write-EventLog -LogName Shopify -Source "Shopify Item Interface" -EntryType Information -EventId 1 `
             -Message "Starting Shopify sync on $NewRecordCount items." 
         # $NewRecords = Get-TervisShopifyItemStagingTableUpdates # Temporary fix
         $Queues = Split-ArrayIntoArrays -InputObject $NewRecords -NumberOfArrays 4
@@ -38,7 +38,7 @@ function Invoke-TervisShopifyInterfaceItemUpdate {
             }
             return $Result
         }
-        Write-EventLog -LogName Shopify -Source "Item Interface" -EntryType Information -EventId 1 `
+        Write-EventLog -LogName Shopify -Source "Shopify Item Interface" -EntryType Information -EventId 1 `
             -Message "Completed Shopify item sync.`nSuccessful: $($isSuccessful.Where({$_ -eq $true}).count)`nFailed: $($isSuccessful.Where({$_ -eq $false}).count)"
     }
 }
@@ -103,7 +103,7 @@ function Invoke-TervisShopifyAddOrUpdateProduct {
         } catch {
             # Write-Warning "$($_.ITEM_NUMBER) could not be created on Shopify"
             Write-Warning $_
-            Write-EventLog -LogName Shopify -Source "Item Interface" -EntryType Warning -EventId 3 `
+            Write-EventLog -LogName Shopify -Source "Shopify Item Interface" -EntryType Warning -EventId 3 `
                 -Message "Could not sync item $($ProductRecord.Item_Number) `nReason:`n$_`n$($_.InvocationInfo.PositionMessage)"
             return $false
         }
@@ -142,7 +142,7 @@ function Invoke-TervisShopifyRemoveProduct {
             return $true
         } catch {
             Write-Warning $_
-            Write-EventLog -LogName Shopify -Source "Item Interface" -EntryType Warning -EventId 3 `
+            Write-EventLog -LogName Shopify -Source "Shopify Item Interface" -EntryType Warning -EventId 3 `
                 -Message "Could not sync item $($ProductRecord.Item_Number) `nReason:`n$_`n$($_.InvocationInfo.PositionMessage)"
             return $false
         }

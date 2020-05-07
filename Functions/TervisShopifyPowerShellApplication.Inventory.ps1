@@ -14,7 +14,7 @@ function Invoke-TervisShopifyInterfaceInventoryUpdate {
     $NewRecordCount = Get-TervisShopifyInventoryStagingTableCount
     if ($NewRecordCount -gt 0) {
         # Get active locations with relevant information, like subinventory code
-        Write-EventLog -LogName Shopify -Source "Inventory Interface" -EntryType Information -EventId 1 `
+        Write-EventLog -LogName Shopify -Source "Shopify Inventory Interface" -EntryType Information -EventId 1 `
             -Message "Starting Shopify inventory sync on $NewRecordCount items." 
         Write-Progress -Activity "Shopify interface - inventory update" -CurrentOperation "Setting Shopify locations"
         $Locations = Get-TervisShopifyActiveLocations -ShopName $ShopName  #| select -first 2 #| ? SUBINVENTORY -EQ "FL0"
@@ -65,7 +65,7 @@ function Invoke-TervisShopifyInterfaceInventoryUpdate {
                                     Out-Null
                             }
                         } catch {
-                            Write-EventLog -LogName Shopify -Source "Inventory Interface" -EntryType Warning -EventId 2 `
+                            Write-EventLog -LogName Shopify -Source "Shopify Inventory Interface" -EntryType Warning -EventId 2 `
                                 -Message "Could not get inventory item information for item #$SKU at $($Parameter.name). Reason:`n$_`n$($_.InvocationInfo.PositionMessage)"
                         }
                         # Write-Warning "Calculating difference"
@@ -105,7 +105,7 @@ function Invoke-TervisShopifyInterfaceInventoryUpdate {
                 }
                 } | Select-Object -ExpandProperty TotalSeconds # end measure-command
                 # Write-Host "$($Parameter.Subinventory): Time to complete query generation: $TimePerStore seconds" -BackgroundColor DarkGray -ForegroundColor Cyan
-                Write-EventLog -LogName Shopify -Source "Inventory Interface" -EntryType Information -EventId 1 -Message @"
+                Write-EventLog -LogName Shopify -Source "Shopify Inventory Interface" -EntryType Information -EventId 1 -Message @"
 Inventory processed for `"$($Parameter.Name)`" in $TimePerStore seconds.
 Inventory items adjusted: $($InventoryToBeAdjusted.Count)
 Inventory items already in sync: $($InventoryAlreadySynced.Count)
@@ -114,12 +114,12 @@ Total inventory items: $($InventoryUpdates.Count)
 "@
             }
             elseif (-not $Parameter.Subinventory) {
-                Write-EventLog -LogName Shopify -Source "Inventory Interface" -EntryType Warning -EventId 2 `
+                Write-EventLog -LogName Shopify -Source "Shopify Inventory Interface" -EntryType Warning -EventId 2 `
                     -Message "No subinventory code found for `"$($Parameter.Name)`". Check the LocationDefinition.csv and make sure it is current."            
             }
             else {
                 Write-Warning "$($Parameter.Subinventory): No new records"
-                Write-EventLog -LogName Shopify -Source "Inventory Interface" -EntryType Information -EventId 1 `
+                Write-EventLog -LogName Shopify -Source "Shopify Inventory Interface" -EntryType Information -EventId 1 `
                 -Message "No inventory changes found for `"$($Parameter.Name)`"."            
 
             }
@@ -288,7 +288,7 @@ function Sync-TervisShopifyInventoryFromQueryObject {
 #         $ObjectBackupFull = "$($ObjectBackup)_$($Queries[0].SubinventoryCode).xml"
 #         Export-Clixml -InputObject $Queries -Path $ObjectBackupFull -Force
         $Queries | Where-Object Synced -EQ "N" | ForEach-Object {
-            Write-EventLog -LogName Shopify -Source "Inventory Interface" -EntryType Warning -EventId 2 -Message @"
+            Write-EventLog -LogName Shopify -Source "Shopify Inventory Interface" -EntryType Warning -EventId 2 -Message @"
 Could not sync $($_.EBSItemNumbers.Count) inventory items to Shopify.
 
 Error:

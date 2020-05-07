@@ -13,16 +13,16 @@ function Invoke-TervisShopifyPowerShellApplicationProvision {
 function Install-TervisShopifyPowerShellApplicationLog {
     param (
         [Parameter(ValueFromPipelineByPropertyName)]$ComputerName,
-        [Parameter(ValueFromPipelineByPropertyName)]$EnvironmentName
+        [Parameter(ValueFromPipelineByPropertyName)][ValidateSet("Delta","Epsilon","Production")]$EnvironmentName
     )
     begin {
-        $LogName = "Shopify"
+        $LogName = "Shopify - $EnvironmentName"
         $LogSources = `
-            "Item Interface",
-            "Order Interface",
-            "Inventory Interface",
-            "Personalizable Item List Upload",
-            "Shopify Azure Blob"
+            "Shopify Item Interface",
+            "Shopify Order Interface",
+            "Shopify Inventory Interface",
+            "Shopify Personalizable Item List Upload",
+            "Shopify EndlessAisle Item List Upload"
     }
     process {
         foreach ($Source in $LogSources) {
