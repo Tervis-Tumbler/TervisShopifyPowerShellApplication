@@ -222,3 +222,64 @@ function ConvertTo-ShopifyFriendlyString {
         return $StringArray -join ""
     }
 }
+
+
+function Get-TervisShopifyAzureBlobCredential {
+    $Guid = "d1f46ea2-45d0-4047-acee-5fa80fdcfa87"
+    if ( -not $Script:TervisShopifyAzureBlobCredential) {
+        $Script:TervisShopifyAzureBlobCredential = Get-TervisPasswordstatePassword -Guid $Guid -AsCredential
+    }
+    return $Script:TervisShopifyAzureBlobCredential
+}
+
+function Set-TervisShopifyAzureBlob {
+    param (
+        [Parameter(Mandatory)]$BlobName,
+        [Parameter(Mandatory)]$Content
+    )
+     
+    $Credential = Get-TervisShopifyAzureBlobCredential
+
+    $method = "PUT"
+    $headerDate = '2019-07-07'
+    $headers = @{"x-ms-version"="$headerDate"}
+    $StorageAccountName = $Credential.UserName
+    $StorageContainerName = "tervisshopify"
+    $StorageAccountKey = $Credential.GetNetworkCredential().Password
+    $Url = "https://$StorageAccountName.blob.core.windows.net/$StorageContainerName/$BlobName"
+    $body = $Content
+    $xmsdate = (Get-Date ([System.DateTimeOffset]::UtcNow).DateTime -Format r).ToString()
+    $bytes = ([System.Text.Encoding]::UTF8.GetBytes($body))
+    $contentLength = $bytes.length
+
+    $headers.Add("x-ms-date",$xmsdate)
+    $headers.Add("Content-Length","$contentLength")
+    $headers.Add("x-ms-blob-type","BlockBlob")
+
+    $signatureString = "$method`n`n`n$contentLength`n`n`n`n`n`n`n`n`n"
+    #Add CanonicalizedHeaders
+    $signatureString += "x-ms-blob-type:" + $headers["x-ms-blob-type"] + "`n"
+    $signatureString += "x-ms-date:" + $headers["x-ms-date"] + "`n"
+    $signatureString += "x-ms-version:" + $headers["x-ms-version"] + "`n"
+    #Add CanonicalizedResource
+    $uri = New-Object System.Uri -ArgumentList $url
+    $signatureString += "/" + $StorageAccountName + $uri.AbsolutePath
+
+    $dataToMac = [System.Text.Encoding]::UTF8.GetBytes($signatureString)
+
+    $accountKeyBytes = [System.Convert]::FromBase64String($StorageAccountKey)
+
+    $hmac = new-object System.Security.Cryptography.HMACSHA256((,$accountKeyBytes))
+    $signature = [System.Convert]::ToBase64String($hmac.ComputeHash($dataToMac))
+
+    $headers.Add("Authorization", "SharedKey " + $StorageAccountName + ":" + $signature);
+
+    try {
+        Invoke-RestMethod -Uri $Url -Method $method -headers $headers -Body $body
+        Write-EventLog -LogName Shopify -Source "Shopify Azure Blob" -EntryType Information -EventId 1 `
+            -Message "$BlobName successfully uploaded to Azure Blob Storage at:`n$Url"
+    } catch {
+        Write-EventLog -LogName Shopify -Source "Shopify Azure Blob" -EntryType Error -EventId 2 `
+            -Message "$BlobName could not be uploaded to Azure Blob Storage. Reason:`n$_`n$($_.InvocationInfo.PositionMessage)"
+    }
+}

@@ -21,7 +21,8 @@ function Install-TervisShopifyPowerShellApplicationLog {
             "Item Interface",
             "Order Interface",
             "Inventory Interface",
-            "Personalizable Item List Upload"
+            "Personalizable Item List Upload",
+            "Shopify Azure Blob"
     }
     process {
         foreach ($Source in $LogSources) {
