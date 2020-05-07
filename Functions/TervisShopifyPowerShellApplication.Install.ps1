@@ -12,11 +12,10 @@ function Invoke-TervisShopifyPowerShellApplicationProvision {
 
 function Install-TervisShopifyPowerShellApplicationLog {
     param (
-        [Parameter(ValueFromPipelineByPropertyName)]$ComputerName,
-        [Parameter(ValueFromPipelineByPropertyName)][ValidateSet("Delta","Epsilon","Production")]$EnvironmentName
+        [Parameter(ValueFromPipelineByPropertyName)]$ComputerName
     )
     begin {
-        $LogName = "Shopify - $EnvironmentName"
+        $LogName = "Shopify"
         $LogSources = `
             "Shopify Item Interface",
             "Shopify Order Interface",
