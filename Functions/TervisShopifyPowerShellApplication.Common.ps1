@@ -246,17 +246,19 @@ function Set-TervisShopifyAzureBlob {
     $StorageAccountName = $Credential.UserName
     $StorageContainerName = "tervisshopify"
     $StorageAccountKey = $Credential.GetNetworkCredential().Password
-    $Url = "https://$StorageAccountName.blob.core.windows.net/$StorageContainerName/$BlobName"
+    $Url = "https://$StorageAccountName.blob.core.windows.net/$StorageContainerName/$BlobName.json"
     $body = $Content
     $xmsdate = (Get-Date ([System.DateTimeOffset]::UtcNow).DateTime -Format r).ToString()
     $bytes = ([System.Text.Encoding]::UTF8.GetBytes($body))
     $contentLength = $bytes.length
+    $ContentType = "application/json"
 
-    $headers.Add("x-ms-date",$xmsdate)
     $headers.Add("Content-Length","$contentLength")
+    $headers.Add("Content-Type",$ContentType)
+    $headers.Add("x-ms-date",$xmsdate)
     $headers.Add("x-ms-blob-type","BlockBlob")
 
-    $signatureString = "$method`n`n`n$contentLength`n`n`n`n`n`n`n`n`n"
+    $signatureString = "$method`n`n`n$contentLength`n`n$ContentType`n`n`n`n`n`n`n"
     #Add CanonicalizedHeaders
     $signatureString += "x-ms-blob-type:" + $headers["x-ms-blob-type"] + "`n"
     $signatureString += "x-ms-date:" + $headers["x-ms-date"] + "`n"
@@ -275,11 +277,9 @@ function Set-TervisShopifyAzureBlob {
     $headers.Add("Authorization", "SharedKey " + $StorageAccountName + ":" + $signature);
 
     try {
-        Invoke-RestMethod -Uri $Url -Method $method -headers $headers -Body $body
-        Write-EventLog -LogName Shopify -Source "Shopify Azure Blob" -EntryType Information -EventId 1 `
-            -Message "$BlobName successfully uploaded to Azure Blob Storage at:`n$Url"
+        Invoke-RestMethod -Uri $Url -Method $method -headers $headers -Body $body | Out-Null
+        return $Url
     } catch {
-        Write-EventLog -LogName Shopify -Source "Shopify Azure Blob" -EntryType Error -EventId 2 `
-            -Message "$BlobName could not be uploaded to Azure Blob Storage. Reason:`n$_`n$($_.InvocationInfo.PositionMessage)"
+        throw "$_`n$($_.InvocationInfo.PositionMessage)"
     }
 }

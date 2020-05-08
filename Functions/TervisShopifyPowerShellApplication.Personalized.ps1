@@ -7,32 +7,21 @@ function Get-TervisShopifyPersonalizableItems {
 
 function Invoke-TervisShopifyPersonalizableItemListUpload {
     param (
-        [Parameter(Mandatory)]$PackagePath,
         [Parameter(Mandatory)][ValidateSet("Delta","Epsilon","Production")]$Environment
     )
-    $Branch = switch ($Environment) {
-        "Delta" { "delta"; break }
-        "Epsilon" { "epsilon"; break}
-        "Production" { "master"; break}
-    }
 
-    Write-EventLog -LogName Shopify -Source "Personalizable Item List Upload" -EntryType Information -EventId 1 `
+    Write-EventLog -LogName Shopify -Source "Shopify Azure Blob" -EntryType Information -EventId 1 `
         -Message "Starting personalizable item upload"
     try {
-        Set-Location -Path $PackagePath
-        git checkout $Branch
         $PersonalizableItems = Get-TervisShopifyPersonalizableItems 
-        $PersonalizableItems | ConvertTo-Json -Compress | Out-File -FilePath "./TervisPersonalizableItems.json" -Force -Encoding utf8
-        $CommitMessage = "$(Get-Date -Format 'yyyyMMdd_HHmmss') - $($PersonalizableItems.Count) items"
-        git commit -a -m "'$($CommitMessage)'"
-        $PatchNumber = npm version patch
-        if ($Environment -eq "Production") { npm publish }
-        git push origin $Branch
-        Write-EventLog -LogName Shopify -Source "Personalizable Item List Upload" -EntryType Information -EventId 1 `
-            -Message "Personalizable item list updated to $PatchNumber`nCommit: '$CommitMessage'"
+        $JsonString = $PersonalizableItems | ConvertTo-Json -Compress
+        $Url = Set-TervisShopifyAzureBlob -BlobName "PersonalizableItems_$Environment" -Content $JsonString
+
+        Write-EventLog -LogName Shopify -Source "Shopify Azure Blob" -EntryType Information -EventId 1 `
+            -Message "PersonalizableItems_$Environment successfully uploaded to Azure Blob Storage at:`n$Url"
     } catch {
-        Write-EventLog -LogName Shopify -Source "Personalizable Item List Upload" -EntryType Error -EventId 2 `
-            -Message "Something went wrong.`nReason:`n$_`n$($_.InvocationInfo.PositionMessage)"
+        Write-EventLog -LogName Shopify -Source "Shopify Azure Blob" -EntryType Error -EventId 2 `
+            -Message "Something went wrong.`nReason:`n$_"
     }
 }
 

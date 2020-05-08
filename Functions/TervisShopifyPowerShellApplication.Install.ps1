@@ -8,6 +8,8 @@ function Invoke-TervisShopifyPowerShellApplicationProvision {
     $Nodes | Install-TervisShopifyPowerShellApplication_ItemInterface
     $Nodes | Install-TervisShopifyPowerShellApplication_InventoryInterface
     $Nodes | Install-TervisShopifyPowerShellApplication_OrderInterface
+    $Nodes | Install-TervisShopifyPowerShellApplication_PersonalizableItemListUpload
+    $Nodes | Install-TervisShopifyPowerShellApplication_EndlessAisleItemListUpload
 }
 
 function Install-TervisShopifyPowerShellApplicationLog {
@@ -174,22 +176,9 @@ function Install-TervisShopifyPowerShellApplication_PersonalizableItemListUpload
         [ValidateSet("Delta","Epsilon","Production")]$EnvironmentName
     )
     begin {
-        # Set up GitHub
-            # git config --global user.name "Username"
-            # git config --global user.email "Email address"
-            # this is more difficult than expected, just use vscode to setup login
-            
-        # Set up NPM
-            # https://docs.npmjs.com/cli/adduser
-            # npm adduser --global --scope=@tervis
         $ScheduledTasksCredential = Get-TervisPasswordstatePassword -Guid "eed2bd81-fd47-4342-bd59-b396da75c7ed" -AsCredential
-        # $GithubCredential = Get-TervisPasswordstatePassword -Guid "66dcd073-3c80-43c4-b180-4a1ca81ba06e"
     }
     process {
-        Invoke-Command -ComputerName $ComputerName -Credential $ScheduledTasksCredential -ScriptBlock {
-            Set-Location $env:USERPROFILE
-            git clone https://github.com/Tervis-Tumbler/TervisPersonalizableItemsJS
-        }
         $PowerShellApplicationParameters = @{
             ComputerName = $ComputerName
             EnvironmentName = $EnvironmentName
@@ -212,7 +201,49 @@ function Install-TervisShopifyPowerShellApplication_PersonalizableItemListUpload
             RepetitionIntervalName = "EveryDayAt6am"
             CommandString = @"
 Set-TervisEBSEnvironment -Name $EnvironmentName 2> `$null
-Invoke-TervisShopifyPersonalizableItemListUpload -PackagePath `$env:USERPROFILE\TervisPersonalizableItemsJS -Environment $EnvironmentName
+Invoke-TervisShopifyPersonalizableItemListUpload -Environment $EnvironmentName
+"@
+            ScheduledTasksCredential = $ScheduledTasksCredential
+        }
+        
+        Install-PowerShellApplication @PowerShellApplicationParameters
+    }
+}
+
+function Install-TervisShopifyPowerShellApplication_EndlessAisleItemListUpload {
+    param (
+        [Parameter(Mandatory,ValueFromPipelineByPropertyName)]$ComputerName,
+        [Parameter(Mandatory,ValueFromPipelineByPropertyName)]
+        [ValidateSet("Delta","Epsilon","Production")]$EnvironmentName
+    )
+    begin {
+        $ScheduledTasksCredential = Get-TervisPasswordstatePassword -Guid "eed2bd81-fd47-4342-bd59-b396da75c7ed" -AsCredential
+    }
+    process {
+
+        $PowerShellApplicationParameters = @{
+            ComputerName = $ComputerName
+            EnvironmentName = $EnvironmentName
+            ModuleName = "TervisShopifyPowerShellApplication"
+            TervisModuleDependencies = `
+                "WebServicesPowerShellProxyBuilder",
+                "PasswordstatePowershell",
+                "TervisPasswordstatePowershell",
+                "TervisPowerShellJobs",
+                "OracleE-BusinessSuitePowerShell",
+                "TervisOracleE-BusinessSuitePowerShell",
+                "InvokeSQL",
+                "TervisMicrosoft.PowerShell.Utility",
+                "TervisMicrosoft.PowerShell.Security",
+                "ShopifyPowerShell",
+                "TervisShopify",
+                "TervisShopifyPowerShellApplication"
+            NugetDependencies = "Oracle.ManagedDataAccess.Core"
+            ScheduledTaskName = "ShopifyEndlessAisleItemListUpload"
+            RepetitionIntervalName = "EveryDayAt6am"
+            CommandString = @"
+Set-TervisEBSEnvironment -Name $EnvironmentName 2> `$null
+Invoke-TervisShopifyEndlessAisleItemListUpload -Environment $EnvironmentName
 "@
             ScheduledTasksCredential = $ScheduledTasksCredential
         }
