@@ -17,11 +17,11 @@ function Install-TervisShopifyPowerShellApplicationLog {
     begin {
         $LogName = "Shopify"
         $LogSources = `
-            "Shopify Item Interface",
-            "Shopify Order Interface",
-            "Shopify Inventory Interface",
-            "Shopify Personalizable Item List Upload",
-            "Shopify EndlessAisle Item List Upload"
+            "Item Interface",
+            "Order Interface",
+            "Inventory Interface",
+            "Personalizable Item List Upload",
+            "Shopify Azure Blob"
     }
     process {
         foreach ($Source in $LogSources) {
