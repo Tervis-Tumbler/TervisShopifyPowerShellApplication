@@ -57,6 +57,7 @@ function Invoke-TervisShopifyAddOrUpdateProduct {
                 $Title = $ProductRecord.ITEM_DESCRIPTION
             }
             $IsOnline = if ($ProductRecord.WEB_PRIMARY_NAME -and $ProductRecord.IMAGE_URL) { $true } else { $false }
+            $IsTaxable = $ProductRecord | Get-TervisShopifyProductIsTaxable
             $FoundShopifyProduct = Find-ShopifyProduct -ShopName $ShopName -SKU $ProductRecord.Item_Number
             if ($FoundShopifyProduct.count -gt 1) {throw "Duplicate items found. Cannot update item number $($ProductRecord.Item_Number)"}
             $NewOrUpdatedProduct = if ($FoundShopifyProduct) {
@@ -88,7 +89,8 @@ function Invoke-TervisShopifyAddOrUpdateProduct {
                         -InventoryManagement SHOPIFY `
                         -Price $ProductRecord.ITEM_PRICE `
                         -ImageURL "http://images.tervis.com/is/image/$($ProductRecord.IMAGE_URL)" `
-                        -Vendor "Tervis"
+                        -Vendor "Tervis" `
+                        -Taxable $IsTaxable
                 }
             # Publish item to POS channel
             $ShopifyRESTProduct = @{id = $NewOrUpdatedProduct.id -replace "[^0-9]"}
@@ -125,6 +127,21 @@ function Set-TervisShopifyProductOnlineTag {
     }
     Add-ShopifyTag -ShopName $ShopName -ShopifyGid $ShopifyGID -Tags $AddTag
     Remove-ShopifyTag -ShopName $ShopName -ShopifyGid $ShopifyGID -Tags $RemoveTag
+}
+
+function Get-TervisShopifyProductIsTaxable {
+    param (
+        [Parameter(Mandatory,ValueFromPipeline)]$ProductRecord
+    )
+    process {
+        if (
+            $ProductRecord.ITEM_DESCRIPTION -match "PERS FEE"
+        ) {
+            return "false"
+        } else {
+            return "true"
+        }
+    }
 }
 
 function Invoke-TervisShopifyRemoveProduct {
