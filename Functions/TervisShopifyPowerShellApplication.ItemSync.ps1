@@ -97,7 +97,7 @@ function Invoke-TervisShopifyAddOrUpdateProduct {
             Set-ShopifyRestProductChannel -ShopName $ShopName -Products $ShopifyRESTProduct -Channel global | Out-Null
             
             # Set Online/Offline tags
-            Set-TervisShopifyProductOnlineTag -ShopName $ShopName -ShopifyGID $NewOrUpdatedProduct.id -IsOnline $IsOnline
+            Set-TervisShopifyProductOnlineTag -ShopName $ShopName -ShopifyGID $NewOrUpdatedProduct.id -IsOnline $IsOnline -DesignCollection $ProductRecord.DESIGN_COLLECTION
 
             # Write back to EBS staging table
             Set-TervisShopifyItemStagingTableUpdateFlag -EbsItemNumber $NewOrUpdatedProduct.variants.edges.node.inventoryItem.sku
@@ -116,13 +116,14 @@ function Set-TervisShopifyProductOnlineTag {
     param (
         [Parameter(Mandatory)]$ShopName,
         [Parameter(Mandatory)]$ShopifyGID,
+        $DesignCollection,
         [Parameter(Mandatory)][bool]$IsOnline
     )
     if ($IsOnline) {
-        $AddTag = "Online"
+        $AddTag = "Online",$DesignCollection
         $RemoveTag = "Offline"
     } else {
-        $AddTag = "Offline"
+        $AddTag = "Offline",$DesignCollection
         $RemoveTag = "Online"
     }
     Add-ShopifyTag -ShopName $ShopName -ShopifyGid $ShopifyGID -Tags $AddTag
