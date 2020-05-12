@@ -503,7 +503,7 @@ function Get-TervisShopifyReceiptMethod {
     switch ($PaymentTypeCode) {
         # "CHECK" { $ReceiptMethodId; break } # This is now handled in EBS
         "CASH" { "8001"; break }
-        "CREDIT_CARD" { "10001"; break } # Per greg, this may change between environments.
+        "CREDIT_CARD" { "11001"; break } # Per greg, this may change between environments. DEV: 10001, SIT: 11001
         default {""}
 
     }
