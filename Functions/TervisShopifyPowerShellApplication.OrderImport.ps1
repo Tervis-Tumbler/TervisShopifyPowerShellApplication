@@ -175,10 +175,15 @@ function Get-TervisShopifyReceiptMethod {
         # [Parameter(Mandatory)]$ReceiptMethodId,
         [Parameter(Mandatory)]$PaymentTypeCode
     )
+    if (-not $Script:CCReceiptMethodId) {
+        $Query = "SELECT receipt_method_id FROM apps.AR_RECEIPT_METHODS WHERE name = 'SHOPIFY-Credit Card'"
+        $Script:CCReceiptMethodId = Invoke-EBSSQL -SQLCommand $Query | Select-Object -ExpandProperty RECEIPT_METHOD_ID
+        if (-not $Script:CCReceiptMethodId) { throw "Could not retrieve receipt method from EBS." }
+    }
     switch ($PaymentTypeCode) {
         # "CHECK" { $ReceiptMethodId; break } # This is now handled in EBS
         "CASH" { "8001"; break }
-        "CREDIT_CARD" { "11001"; break } # Per greg, this may change between environments. DEV: 10001, SIT: 11001
+        "CREDIT_CARD" { "$Script:CCReceiptMethodId"; break }
         default {""}
 
     }
