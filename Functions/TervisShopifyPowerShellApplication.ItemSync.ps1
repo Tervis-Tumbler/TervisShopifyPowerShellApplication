@@ -120,10 +120,10 @@ function Set-TervisShopifyProductOnlineTag {
         [Parameter(Mandatory)][bool]$IsOnline
     )
     if ($IsOnline) {
-        $AddTag = "Online",$DesignCollection
+        $AddTag = "Online",$DesignCollection | Where-Object {$_ -ne $null}
         $RemoveTag = "Offline"
     } else {
-        $AddTag = "Offline",$DesignCollection
+        $AddTag = "Offline",$DesignCollection | Where-Object {$_ -ne $null}
         $RemoveTag = "Online"
     }
     Add-ShopifyTag -ShopName $ShopName -ShopifyGid $ShopifyGID -Tags $AddTag
