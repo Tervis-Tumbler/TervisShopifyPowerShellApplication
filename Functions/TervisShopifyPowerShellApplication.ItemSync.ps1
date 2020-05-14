@@ -136,7 +136,8 @@ function Get-TervisShopifyProductIsTaxable {
     )
     process {
         if (
-            $ProductRecord.ITEM_DESCRIPTION -match "PERS FEE"
+            $ProductRecord.ITEM_DESCRIPTION -match "PERS FEE" -or
+            $ProductRecord.ITEM_DESCRIPTION -match "GIFT CARD"
         ) {
             return "false"
         } else {
