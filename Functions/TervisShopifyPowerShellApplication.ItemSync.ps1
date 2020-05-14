@@ -92,6 +92,9 @@ function Invoke-TervisShopifyAddOrUpdateProduct {
                         -Vendor "Tervis" `
                         -Taxable $IsTaxable
                 }
+
+            if (-not $NewOrUpdatedProduct) { throw ($NewOrUpdatedProduct.errors.message -join "`n") }
+            
             # Publish item to POS channel
             $ShopifyRESTProduct = @{id = $NewOrUpdatedProduct.id -replace "[^0-9]"}
             Set-ShopifyRestProductChannel -ShopName $ShopName -Products $ShopifyRESTProduct -Channel global | Out-Null
