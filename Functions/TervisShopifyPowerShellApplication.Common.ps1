@@ -219,7 +219,8 @@ function ConvertTo-ShopifyFriendlyString {
                 return $_.ToString()
             }
         }
-        return $StringArray -join ""
+        $NewString = $StringArray -join ""
+        return $NewString.Replace('"','\"')
     }
 }
 
