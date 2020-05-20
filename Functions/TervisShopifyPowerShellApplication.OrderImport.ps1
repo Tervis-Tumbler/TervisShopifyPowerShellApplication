@@ -199,10 +199,10 @@ function New-TervisShopifyOrderObject {
         $OrderObject = $Order| New-TervisShopifyOrderObjectBase
 
         # Order lines conversion, for both sales and refunds
-        $OrderObject.LineItems = $Order | New-TervisShopifyOrderObjectLines
+        $OrderObject.LineItems += $Order | New-TervisShopifyOrderObjectLines
 
         # Order payments conversion - Disabled during COVID online store
-        $OrderObject.Payments = $Order | New-TervisShopifyOrderObjectPayments -ShopName $ShopName
+        $OrderObject.Payments += $Order | New-TervisShopifyOrderObjectPayments -ShopName $ShopName
 
         return $OrderObject
     }
@@ -405,6 +405,7 @@ function New-TervisShopifyOrderObjectPayments {
         [Parameter(Mandatory)]$ShopName
     )
     process {
+        if (-not $Order.LegacyResourceId) { return } # while returns don't have payment information only 
         [array]$Transactions = $Order | Get-ShopifyRestOrderTransactionDetail -ShopName $ShopName
         
         foreach ($Transaction in $Transactions) {
