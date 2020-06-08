@@ -299,8 +299,8 @@ function New-TervisShopifyOrderObjectLines {
                     $UnitListPrice = $Line.priceSet.shopMoney.amount
                     $UnitSellingPrice = $Line.priceSet.shopMoney.amount
                     $ReturnReasonCode = "STORE RETURN"
-                    # $TaxValue = $Line.totalTaxSet.shopMoney.amount
-                    $TaxValue = 0 # For refunds only, since tax is included in totalRefundSet
+                    $TaxValue = $Line.totalTaxSet.shopMoney.amount
+                    # $TaxValue = 0 # For refunds only, since tax is included in totalRefundSet
                 } else {
                     $LineType = "Tervis Bill Only with Inv Line"
                     $InventoryItem = $Line.sku
