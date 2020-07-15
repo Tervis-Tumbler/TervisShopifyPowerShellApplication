@@ -58,7 +58,7 @@ function Invoke-TervisShopifyAddOrUpdateProduct {
             }
             $IsOnline = if ($ProductRecord.WEB_PRIMARY_NAME -and $ProductRecord.IMAGE_URL) { $true } else { $false }
             $IsTaxable = $ProductRecord | Get-TervisShopifyProductIsTaxable
-            $FoundShopifyProduct = Find-ShopifyProduct -ShopName $ShopName -SKU $ProductRecord.Item_Number -MetafieldNamespace tervis -MetafieldKey ebsDescription
+            $FoundShopifyProduct = Find-ShopifyProduct -ShopName $ShopName -SKU $ProductRecord.Item_Number -MetafieldNamespace tervis
             if ($FoundShopifyProduct.count -gt 1) {throw "Duplicate items found. Cannot update item number $($ProductRecord.Item_Number)"}
             $NewOrUpdatedProduct = if ($FoundShopifyProduct) {
                     [array]$Metafields = $FoundShopifyProduct.metafields.edges.node
