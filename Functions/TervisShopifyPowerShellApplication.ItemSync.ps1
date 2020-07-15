@@ -58,10 +58,19 @@ function Invoke-TervisShopifyAddOrUpdateProduct {
             }
             $IsOnline = if ($ProductRecord.WEB_PRIMARY_NAME -and $ProductRecord.IMAGE_URL) { $true } else { $false }
             $IsTaxable = $ProductRecord | Get-TervisShopifyProductIsTaxable
-            $FoundShopifyProduct = Find-ShopifyProduct -ShopName $ShopName -SKU $ProductRecord.Item_Number
+            $FoundShopifyProduct = Find-ShopifyProduct -ShopName $ShopName -SKU $ProductRecord.Item_Number -MetafieldNamespace tervis -MetafieldKey ebsDescription
             if ($FoundShopifyProduct.count -gt 1) {throw "Duplicate items found. Cannot update item number $($ProductRecord.Item_Number)"}
             $NewOrUpdatedProduct = if ($FoundShopifyProduct) {
-                    # Setting InventoryPolicy to DENY only during COVID
+                    [array]$Metafields = $FoundShopifyProduct.metafields.edges.node
+                    if (-not $Metafields) {
+                        $Metafields = [PSCustomObject]@{
+                            namespace = "tervis"
+                            key = "ebsDescription"
+                            value = $ProductRecord.ITEM_DESCRIPTION
+                            valueType = "STRING"
+                        }
+                    }
+
                     Update-ShopifyProduct -ShopName $ShopName `
                         -Id $FoundShopifyProduct.id `
                         -Title $Title `
@@ -75,7 +84,8 @@ function Invoke-TervisShopifyAddOrUpdateProduct {
                         -InventoryManagement SHOPIFY `
                         -Price $ProductRecord.ITEM_PRICE `
                         -ImageURL "http://images.tervis.com/is/image/$($ProductRecord.IMAGE_URL)" `
-                        -Vendor "Tervis"
+                        -Vendor "Tervis" `
+                        -Metafields $Metafields
                 } else {
                     # Setting InventoryPolicy to DENY only during COVID
                     New-ShopifyProduct -ShopName $ShopName `
@@ -90,7 +100,8 @@ function Invoke-TervisShopifyAddOrUpdateProduct {
                         -Price $ProductRecord.ITEM_PRICE `
                         -ImageURL "http://images.tervis.com/is/image/$($ProductRecord.IMAGE_URL)" `
                         -Vendor "Tervis" `
-                        -Taxable $IsTaxable
+                        -Taxable $IsTaxable `
+                        -MetafieldEBSDescription $ProductRecord.ITEM_DESCRIPTION
                 }
 
             if (-not $NewOrUpdatedProduct) { throw ($NewOrUpdatedProduct.errors.message -join "`n") }
