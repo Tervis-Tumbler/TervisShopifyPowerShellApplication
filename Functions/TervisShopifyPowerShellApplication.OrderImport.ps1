@@ -204,6 +204,9 @@ function New-TervisShopifyOrderObject {
         # Order payments conversion - Disabled during COVID online store
         $OrderObject.Payments += $Order | New-TervisShopifyOrderObjectPayments -ShopName $ShopName
 
+        # Add refund information to OrderObject headers
+        $OrderObject | Add-TervisShopifyRefundOrderHeaderFields -Order $Order
+
         return $OrderObject
     }
 }
@@ -260,6 +263,11 @@ function New-TervisShopifyOrderObjectBase {
                 CREATED_BY_NAME = "'SHOPIFY'"
                 LAST_UPDATED_BY_NAME = "'SHOPIFY'"
                 # Free freight may be needed on original order 
+
+                # Refund fields
+                GLOBAL_ATTRIBUTE9 = "''" # Cash
+                GLOBAL_ATTRIBUTE10 = "''" # Credit card
+                GLOBAL_ATTRIBUTE11 = "''" # Gift card
             }
             Customer = [PSCustomObject]@{}
             LineItems = @()
@@ -454,5 +462,47 @@ function New-TervisShopifyOrderObjectPayments {
                 PAYMENT_TRX_ID = "'$($Transaction.id)'"
             }
         }
+    }
+}
+
+function Add-TervisShopifyRefundOrderHeaderFields {
+    param (
+        [Parameter(Mandatory,ValueFromPipeline)]$OrderObject,
+        $Order
+    )
+    process {
+        if (-not $Order.refundLineItems) { return }
+        $RefundAmounts = $Order | ConvertTo-TervisShopifyDiscreteRefunds
+        $OrderObject.Header.GLOBAL_ATTRIBUTE9 = $RefundAmounts.Cash 
+        $OrderObject.Header.GLOBAL_ATTRIBUTE10 = $RefundAmounts.CreditCard
+        $OrderObject.Header.GLOBAL_ATTRIBUTE11 = $RefundAmounts.GiftCard
+    }
+}
+
+function ConvertTo-TervisShopifyDiscreteRefunds {
+    param (
+        [Parameter(Mandatory,ValueFromPipeline)]$Order
+    )
+    process {
+        if (-not $Order.refundLineItems) { return }
+        $RefundAmounts = [PSCustomObject]@{
+            Cash = "0"
+            CreditCard = "0"
+            GiftCard = "0"
+        }
+        foreach ($Node in $Order.transactions.edges.node) {
+            switch ($Node.gateway) {
+                "cash" {
+                    $RefundAmounts.Cash =  $Node.amountSet.shopMoney.amount
+                }
+                "shopify_payments" {
+                    $RefundAmounts.CreditCard =  $Node.amountSet.shopMoney.amount
+                }
+                "Givex" {
+                    $RefundAmounts.GiftCard = $Node.amountSet.shopMoney.amount
+                }
+            }
+        }
+        return $RefundAmounts
     }
 }
