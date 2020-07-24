@@ -56,7 +56,8 @@ function Invoke-TervisShopifyAddOrUpdateProduct {
             } else {
                 $Title = $ProductRecord.ITEM_DESCRIPTION
             }
-            $IsOnline = if ($ProductRecord.WEB_PRIMARY_NAME -and $ProductRecord.IMAGE_URL) { $true } else { $false }
+            $ImageURLResolved = Invoke-TervisShopifyResolveEBSImageURL -EBSImageURL $ProductRecord.IMAGE_URL
+            $IsOnline = if ($ProductRecord.WEB_PRIMARY_NAME -and $ImageURLResolved) { $true } else { $false }
             $IsTaxable = $ProductRecord | Get-TervisShopifyProductIsTaxable
             $FoundShopifyProduct = Find-ShopifyProduct -ShopName $ShopName -SKU $ProductRecord.Item_Number -MetafieldNamespace tervis
             if ($FoundShopifyProduct.count -gt 1) {throw "Duplicate items found. Cannot update item number $($ProductRecord.Item_Number)"}
@@ -83,11 +84,10 @@ function Invoke-TervisShopifyAddOrUpdateProduct {
                         -Tracked true `
                         -InventoryManagement SHOPIFY `
                         -Price $ProductRecord.ITEM_PRICE `
-                        -ImageURL "http://images.tervis.com/is/image/$($ProductRecord.IMAGE_URL)" `
+                        -ImageURL $ImageURLResolved `
                         -Vendor "Tervis" `
                         -Metafields $Metafields
                 } else {
-                    # Setting InventoryPolicy to DENY only during COVID
                     New-ShopifyProduct -ShopName $ShopName `
                         -Title $Title `
                         -Description $Description `
@@ -98,7 +98,7 @@ function Invoke-TervisShopifyAddOrUpdateProduct {
                         -Tracked true `
                         -InventoryManagement SHOPIFY `
                         -Price $ProductRecord.ITEM_PRICE `
-                        -ImageURL "http://images.tervis.com/is/image/$($ProductRecord.IMAGE_URL)" `
+                        -ImageURL $ImageURLResolved `
                         -Vendor "Tervis" `
                         -Taxable $IsTaxable `
                         -MetafieldEBSDescription $ProductRecord.ITEM_DESCRIPTION
@@ -124,6 +124,23 @@ function Invoke-TervisShopifyAddOrUpdateProduct {
             return $false
         }
     }
+}
+
+function Invoke-TervisShopifyResolveEBSImageURL {
+    param (
+        $EBSImageURL
+    )
+    
+    if (-not $EBSImageURL) { return }
+    $EBSImageURL = $EBSImageURL -replace 'HIGH PERFORMANCE LID','SSWMBLID-PER'
+    $EBSImageURL = $EBSImageURL -replace 'DELUXE SPOUT LID','SSWMBLID-DEL'
+    $FullURL = "http://images.tervis.com/is/image/$EBSImageURL"
+    try {
+        Invoke-WebRequest -Uri $FullURL | Out-Null
+    } catch {
+        return
+    }
+    return $FullURL 
 }
 
 function Set-TervisShopifyProductOnlineTag {
