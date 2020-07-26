@@ -501,11 +501,19 @@ function Add-TervisShopifyItemCollectionTag {
     foreach ($EBSItemNumber in $EBSItemNumbers) {
         Write-Progress -Activity "Adding Collection Tags" -CurrentOperation $EBSItemNumber -PercentComplete $($i/$total)
         try {
-            $Collection = Get-TervisShopifyEBSItem -EBSItemNumber $EBSItemNumber | Select-Object -ExpandProperty DESIGN_COLLECTION
+            $EBSItem = Get-TervisShopifyEBSItem -EBSItemNumber $EBSItemNumber
+            $Collection = $EBSItem | Select-Object -ExpandProperty DESIGN_COLLECTION
             $SuperCollection = Get-TervisShopifySuperCollectionName -Collection $Collection
             $ShopifyGID = Find-ShopifyProduct -SKU $EBSItemNumber -ShopName $ShopName | Select-Object -ExpandProperty id
+            
+            $ImageURLResolved = Invoke-TervisShopifyResolveEBSImageURL -EBSImageURL $EBSItem.IMAGE_URL
+            $IsOnline = if ($EBSItem.WEB_PRIMARY_NAME -and $ImageURLResolved) { $true } else { $false }
+            
             if (-not $ShopifyGID) { throw "Item not on Shopify" }
-            Add-ShopifyTag -ShopName $ShopName -ShopifyGid $ShopifyGID -Tags $Collection,$SuperCollection,"Online"
+            
+            # Add-ShopifyTag -ShopName $ShopName -ShopifyGid $ShopifyGID -Tags $Collection,$SuperCollection,"Online"
+            Set-TervisShopifyProductOnlineTag -ShopName $ShopName -ShopifyGID $ShopifyGID -IsOnline $IsOnline -DesignCollection Collection
+            if ($SuperCollection) {Add-ShopifyTag -ShopName $ShopName -ShopifyGid $ShopifyGID -Tags $SuperCollection}
         } catch { 
             Write-Warning "$EBSItemNumber`: Could not add tag. Reason: $_"
         }
