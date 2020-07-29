@@ -58,7 +58,7 @@ function New-TervisShopifyBuildToOrderCustomerInfo {
             CITY = "'$($Order.CustomAttributes.customerCity)'"
             STATE = "'$($Order.CustomAttributes.customerState)'" # This still returns full state name. Check GraphQL query.
             POSTAL_CODE = "'$($Order.CustomAttributes.customerZip)'"
-            COUNTRY = "'$($Order.CustomAttributes.customerCountry)'"
+            COUNTRY = "'$($Order.CustomAttributes.customerCountryCode)'"
             PROCESS_FLAG = "'N'"
             SOURCE_NAME = "'RMS'"
             OPERATING_UNIT_NAME = "'Tervis Operating Unit'"
@@ -86,6 +86,8 @@ function New-TervisShopifyBuildToOrderLines {
     process {
         # Add TervisPropterties to all llne items 
         $Order.lineItems.edges.node | Add-TervisShopifyLineItemProperties
+        $Order.lineItems.edges.node | Invoke-TervisShopifyLineItemSkuSubstitution
+
         $CombinedLineItems = @()
         # Personalization:
         $CombinedLineItems += $Order | Select-TervisShopifyOrderPersonalizationLines
