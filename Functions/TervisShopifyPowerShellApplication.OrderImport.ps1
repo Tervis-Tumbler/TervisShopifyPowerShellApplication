@@ -229,12 +229,17 @@ function Invoke-TervisShopifyLineItemSkuSubstitution {
         [Parameter(Mandatory,ValueFromPipeline)]$LineItem
     )
     process {
-        switch ($LineItem.sku) {
-            # Substitutes custom shipping SKU in Shopify with the "FREIGHT" EBS item number
-            "Shipping-Standard"     { $NewSKU = "1097271"; break }
-            "Shipping-Overnight"    { $NewSKU = "1097271"; break }
-            "Shipping-Extended"     { $NewSKU = "1097271"; break }
-            Default { $NewSku = $LineItem.sku}
+        $CustomAttributes = $LineItem | Convert-TervisShopifyCustomAttributesToObject
+        if ($LineItem.sku) {
+            switch ($LineItem.sku) {
+                # Substitutes custom shipping SKU in Shopify with the "FREIGHT" EBS item number
+                "Shipping-Standard"     { $NewSKU = "1097271"; break }
+                "Shipping-Overnight"    { $NewSKU = "1097271"; break }
+                "Shipping-Extended"     { $NewSKU = "1097271"; break }
+                Default { $NewSku = $LineItem.sku}
+            }
+        } elseif ($CustomAttributes.missingItem) {
+            $NewSku = $CustomAttributes.missingItem
         }
         $LineItem | Add-Member -MemberType NoteProperty -Name sku -Value $NewSKU -Force
     }
