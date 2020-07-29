@@ -236,6 +236,12 @@ function Invoke-TervisShopifyLineItemSkuSubstitution {
                 "Shipping-Standard"     { $NewSKU = "1097271"; break }
                 "Shipping-Overnight"    { $NewSKU = "1097271"; break }
                 "Shipping-Extended"     { $NewSKU = "1097271"; break }
+                # Substitutes GivexAct Shopify SKU with "GIFT CARD" EBS item number
+                "GivexAct10"    { $NewSKU = "1314274"; break } 
+                "GivexAct25"    { $NewSKU = "1314274"; break } 
+                "GivexAct50"    { $NewSKU = "1314274"; break } 
+                "GivexAct100"   { $NewSKU = "1314274"; break } 
+                # Else just keep existing SKU
                 Default { $NewSku = $LineItem.sku}
             }
         } elseif ($CustomAttributes.missingItem) {
