@@ -41,7 +41,7 @@ function Invoke-TervisShopifyInterfaceInventoryUpdate {
             ) {
                 $TimePerStore = Measure-Command { # to measure process per store
                 $InventoryUpdates = Get-TervisShopifyInventoryStagingTableUpdates -SubinventoryCode $Parameter.Subinventory #| select -first 1000
-                $InventoryUpdates | % {if ($_.SUBINVENTORY_CODE -ne "FL1") {$_.ON_HAND_QTY = 0}} # Temporary COVID update
+                # $InventoryUpdates | % {if ($_.SUBINVENTORY_CODE -ne "FL1") {$_.ON_HAND_QTY = 0}} # Temporary COVID update
                 Write-Warning "$($Parameter.Subinventory): Testing InventoryUpdates - Count: $($InventoryUpdates.Count)"
                 #Get current inventory - Get-ShopifyInventoryAtLocation
                 # Measure-Command {
@@ -135,6 +135,7 @@ function Get-TervisShopifyInventoryStagingTableCount {
         SELECT count(*) 
         FROM xxtrvs.xxinv_store_ohq
         WHERE 1 = 1
+        AND SUBSTR(item_number,-1)!= 'P'
         AND interfaced_flag = 'N'
         $(if ($SubinventoryCode) {"AND subinventory_code = '$SubinventoryCode'"})
 "@
@@ -152,6 +153,7 @@ function Get-TervisShopifyInventoryStagingTableUpdates {
                 ,on_hand_qty               
         FROM xxtrvs.xxinv_store_ohq
         WHERE 1 = 1
+        AND SUBSTR(item_number,-1)!= 'P'
         AND interfaced_flag = 'N'
         $(if ($SubinventoryCode) {"AND subinventory_code = '$SubinventoryCode'"})
         ORDER BY on_hand_qty DESC
