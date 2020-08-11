@@ -441,6 +441,7 @@ function New-TervisShopifyOrderObjectPayments {
                 }
             # $CheckNumber = if ($PaymentTypeCode -eq "CHECK") {""}
             # $ReceiptMethodId = Get-TervisShopifyReceiptMethod -ReceiptMethodId $Order.ReceiptMethodId -PaymentTypeCode $PaymentTypeCode # if ($PaymentTypeCode -eq "CHECK") {$Order.ReceiptMethodId}
+            $CreationDate = $Transaction.processed_at | ConvertTo-TervisShopifyOracleSqlDateString
             $ReceiptMethodId = Get-TervisShopifyReceiptMethod -PaymentTypeCode $PaymentTypeCode
 
             [PSCustomObject]@{
@@ -458,7 +459,7 @@ function New-TervisShopifyOrderObjectPayments {
                 CREDIT_CARD_APPROVAL_DATE = "$CreditCardApprovalDate"
                 # CHECK_NUMBER = $CheckNumber
                 PAYMENT_AMOUNT = $Transaction.amount
-                CREATION_DATE = "sysdate"
+                CREATION_DATE = "$CreationDate"
                 LAST_UPDATE_DATE = "sysdate"
                 CREDIT_CARD_EXPIRATION_MONTH = "'$($Transaction.receipt.payment_method_details.card.exp_month)'"
                 CREDIT_CARD_EXPIRATION_YEAR = "'$($Transaction.receipt.payment_method_details.card.exp_year)'"
