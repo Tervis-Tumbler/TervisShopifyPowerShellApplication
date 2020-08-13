@@ -303,7 +303,8 @@ function New-TervisShopifyOrderObjectLines {
         #     $Order | Set-TervisShopifyRefundLineItemPricesToZero
         #     $Order | Add-TervisShopifyTotalRefundSetLineItem
         # }
-
+        $Order.$LineItemType.edges.node | Invoke-TervisShopifyLineDiscountRecalculation
+        
         $LineItems += foreach ($Line in $Order.$LineItemType.edges.node) {
             if ($Line.quantity -ne 0) {
 
@@ -362,6 +363,20 @@ function New-TervisShopifyOrderObjectLines {
     }
 }
 
+function Invoke-TervisShopifyLineDiscountRecalculation {
+    param (
+        [Parameter(Mandatory,ValueFromPipeline)]$LineItem
+    )
+    process {
+        $ListUnitPrice = $LineItem.originalUnitPriceSet.shopMoney.amount
+        $DiscountedUnitPrice = $LineItem.discountedUnitPriceSet.shopMoney.amount
+        $DiscountedLineTotal = $LineItem.discountedTotalSet.shopMoney.amount
+        
+        if ($ListUnitPrice -eq $DiscountedUnitPrice) { return }
+        $ActualDiscountedPricePerUnit = $DiscountedLineTotal / $LineItem.quantity
+        $LineItem.discountedUnitPriceSet.shopMoney.amount = $ActualDiscountedPricePerUnit
+    }
+}
 function Add-TervisShopifyShippingLineItem {
     param (
         [Parameter(Mandatory,ValueFromPipeline)]$Order
