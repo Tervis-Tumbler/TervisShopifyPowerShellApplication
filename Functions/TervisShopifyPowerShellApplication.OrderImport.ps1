@@ -439,7 +439,10 @@ function New-TervisShopifyOrderObjectPayments {
         [Parameter(Mandatory)]$ShopName
     )
     process {
-        if (-not $Order.LegacyResourceId) { return } # while returns don't have payment information only 
+        if (
+            -not $Order.LegacyResourceId -or # while returns don't have payment information only 
+            $Order.IsOnlineOrder # until we are ready to process payments from QuickShip
+        ) { return } 
         [array]$Transactions = $Order | Get-ShopifyRestOrderTransactionDetail -ShopName $ShopName
         
         foreach ($Transaction in $Transactions) {
