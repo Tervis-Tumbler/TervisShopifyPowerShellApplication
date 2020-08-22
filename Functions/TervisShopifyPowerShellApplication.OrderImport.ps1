@@ -438,11 +438,29 @@ function New-TervisShopifyOrderObjectPayments {
         [Parameter(Mandatory,ValueFromPipeline)]$Order,
         [Parameter(Mandatory)]$ShopName
     )
+    begin {
+        $ExceptionList = 
+        "Tervis Factory Store - Frankenmuth, MI",
+        "Tervis Factory Store - Myrtle Beach, SC",
+        "Tervis Factory Store - Panama City Beach, FL",
+        "Tervis Factory Store - Branson, MO",
+        "Tervis Factory Store - Pigeon Forge, TN",
+        "Tervis Factory Store - Gatlinburg, TN",
+        "Tervis Factory Store - Charleston, SC",
+        "Tervis Factory Store - Key West, FL",
+        "Tervis Factory Store - Bloomington, MN",
+        "Tervis Factory Store - Las Vegas, NV",
+        "Tervis Factory Store - The Villages, FL",
+        "Tervis Factory Store - Palm Beach, FL",
+        "Tervis Factory Store - Osprey, FL",
+        "Tervis Factory Store - Cincinnati, OH"
+    }
     process {
         if (
             -not $Order.LegacyResourceId -or # while returns don't have payment information only 
-            $Order.IsOnlineOrder # until we are ready to process payments from QuickShip
-        ) { return } 
+            $Order.IsOnlineOrder -or # until we are ready to process payments from QuickShip. Need to figure out blank exp date on Apple Pay
+            $Order.physicalLocation.name -in $ExceptionList # until store is running full Shopify
+        ) { return }
         [array]$Transactions = $Order | Get-ShopifyRestOrderTransactionDetail -ShopName $ShopName
         
         foreach ($Transaction in $Transactions) {
