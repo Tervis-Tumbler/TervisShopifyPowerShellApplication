@@ -303,7 +303,7 @@ function New-TervisShopifyOrderObjectLines {
         #     $Order | Set-TervisShopifyRefundLineItemPricesToZero
         #     $Order | Add-TervisShopifyTotalRefundSetLineItem
         # }
-        $Order.$LineItemType.edges.node | Invoke-TervisShopifyLineDiscountRecalculation
+        $Order.$LineItemType.edges.node | Invoke-TervisShopifyLineDiscountRecalculation -IsRefund:$IsRefund
         
         $LineItems += foreach ($Line in $Order.$LineItemType.edges.node) {
             if ($Line.quantity -ne 0) {
@@ -316,8 +316,8 @@ function New-TervisShopifyOrderObjectLines {
                     $LineType = "Tervis Credit Only Line"
                     $InventoryItem = $Line.lineItem.sku
                     $OrderedQuantity = $Line.quantity * -1
-                    $UnitListPrice = $Line.priceSet.shopMoney.amount
-                    $UnitSellingPrice = $Line.priceSet.shopMoney.amount
+                    $UnitListPrice = $Line.lineItem.originalUnitPriceSet.shopMoney.amount
+                    $UnitSellingPrice = $Line.lineItem.discountedUnitPriceSet.shopMoney.amount
                     $ReturnReasonCode = "STORE RETURN"
                     $TaxValue = $Line.totalTaxSet.shopMoney.amount
                     # $TaxValue = 0 # For refunds only, since tax is included in totalRefundSet
@@ -365,9 +365,15 @@ function New-TervisShopifyOrderObjectLines {
 
 function Invoke-TervisShopifyLineDiscountRecalculation {
     param (
-        [Parameter(Mandatory,ValueFromPipeline)]$LineItem
+        [Parameter(Mandatory,ValueFromPipeline)]$Line,
+        [switch]$IsRefund
     )
     process {
+        if ($IsRefund) {
+            $LineItem = $Line.lineItem
+        } else {
+            $LineItem = $Line
+        }
         $ListUnitPrice = $LineItem.originalUnitPriceSet.shopMoney.amount
         $DiscountedUnitPrice = $LineItem.discountedUnitPriceSet.shopMoney.amount
         $DiscountedLineTotal = $LineItem.discountedTotalSet.shopMoney.amount
@@ -377,6 +383,7 @@ function Invoke-TervisShopifyLineDiscountRecalculation {
         $LineItem.discountedUnitPriceSet.shopMoney.amount = $ActualDiscountedPricePerUnit
     }
 }
+
 function Add-TervisShopifyShippingLineItem {
     param (
         [Parameter(Mandatory,ValueFromPipeline)]$Order
