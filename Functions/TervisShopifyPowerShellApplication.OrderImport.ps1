@@ -447,10 +447,7 @@ function New-TervisShopifyOrderObjectPayments {
     )
     begin {
         $ExceptionList = 
-        "Tervis Factory Store - Frankenmuth, MI",
         "Tervis Factory Store - Myrtle Beach, SC",
-        "Tervis Factory Store - Panama City Beach, FL",
-        "Tervis Factory Store - Branson, MO",
         "Tervis Factory Store - Pigeon Forge, TN",
         "Tervis Factory Store - Gatlinburg, TN",
         "Tervis Factory Store - Charleston, SC",
