@@ -306,7 +306,10 @@ function New-TervisShopifyOrderObjectLines {
         $Order.$LineItemType.edges.node | Invoke-TervisShopifyLineDiscountRecalculation -IsRefund:$IsRefund
         
         $LineItems += foreach ($Line in $Order.$LineItemType.edges.node) {
-            if ($Line.quantity -ne 0) {
+            if (
+                $Line.quantity -ne 0 -and
+                $Line.name -notlike "Personalization for*"
+            ) {
 
                 $LineItemCounter++
     
@@ -447,15 +450,7 @@ function New-TervisShopifyOrderObjectPayments {
     )
     begin {
         $ExceptionList = 
-        "Tervis Factory Store - Myrtle Beach, SC",
-        "Tervis Factory Store - Pigeon Forge, TN",
-        "Tervis Factory Store - Gatlinburg, TN",
-        "Tervis Factory Store - Charleston, SC",
-        "Tervis Factory Store - Key West, FL",
-        "Tervis Factory Store - Bloomington, MN",
-        "Tervis Factory Store - Las Vegas, NV",
-        "Tervis Factory Store - The Villages, FL",
-        "Tervis Factory Store - Palm Beach, FL",
+
         "Tervis Factory Store - Osprey, FL",
         "Tervis Factory Store - Cincinnati, OH"
     }
