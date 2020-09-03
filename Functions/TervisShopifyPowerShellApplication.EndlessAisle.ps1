@@ -1,5 +1,5 @@
 function Get-TervisShopifyEndlessAisleItems {
-    $Query = "SELECT item_number FROM xxtrvs.xxtrvs_store_item_price_intf WHERE internal_order_enabled_flag = 'Y' AND item_number NOT LIKE '%P'"
+    $Query = "SELECT item_number FROM xxtrvs.xxtrvs_store_item_price_intf WHERE internal_order_enabled_flag = 'Y' AND item_status = 'Active' AND item_number NOT LIKE '%P'"
     $EndlessAisleItems = Invoke-EBSSQL $Query | Select-Object -ExpandProperty item_number
     return $EndlessAisleItems
 }
