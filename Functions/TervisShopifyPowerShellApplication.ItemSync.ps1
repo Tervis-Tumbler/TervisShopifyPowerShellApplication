@@ -113,6 +113,12 @@ function Invoke-TervisShopifyAddOrUpdateProduct {
             # Set Online/Offline tags
             Set-TervisShopifyProductOnlineTag -ShopName $ShopName -ShopifyGID $NewOrUpdatedProduct.id -IsOnline $IsOnline -DesignCollection $ProductRecord.DESIGN_COLLECTION
 
+            # Temporary fix until Shopify adds special tax to Branson store location
+            $BrasonTaxOverrideCollection = Find-TervisShopifyCollection -ShopName $ShopName -CollectionName "Branson-Tax-Override"
+            if ($BrasonTaxOverrideCollection) {
+                Add-TervisShopifyProductToCollection -ShopName $ShopName -ShopifyCollectionGID $BrasonTaxOverrideCollection.id -ShopifyProductGIDs $NewOrUpdatedProduct.id | Out-Null
+            }
+
             # Write back to EBS staging table
             Set-TervisShopifyItemStagingTableUpdateFlag -EbsItemNumber $NewOrUpdatedProduct.variants.edges.node.inventoryItem.sku
             return $true
