@@ -201,6 +201,7 @@ function Add-TervisShopifyOrderPersonalizationSKU {
     )
     process {
         $Price = $PersonalizationLine.originalUnitPriceSet.shopMoney.amount
+        # Basing this on price is fragile. Try basing it on presence of one or two personalization sides.
         switch ($Price) {
             "5.0"   { $SKU = "1154266"; break }
             "7.5"   { $SKU = "1154269"; break }
@@ -220,6 +221,7 @@ function Set-TervisShopifyOrderPersonalizedItemNumber {
             $RelatedLineItemSKU = $CustomAttributes.RelatedLineItemSKU
             $LineItemSource = $Order | Select-TervisShopifyOrderLineItem -SKU $RelatedLineItemSKU
             $NewLineItem = $LineItemSource | ConvertTo-Json -Depth 10 -Compress  | ConvertFrom-Json
+            $NewLineItem.node.customAttributes = $null
             $NewLineItem.node.quantity = $PersonalizationLine.quantity
             $NewLineItem.node.sku = "$($CustomAttributes.RelatedLineItemSKU)P"
             $Order.lineItems.edges += $NewLineItem

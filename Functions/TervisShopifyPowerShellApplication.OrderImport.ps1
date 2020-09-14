@@ -229,6 +229,7 @@ function Invoke-TervisShopifyLineItemSkuSubstitution {
         [Parameter(Mandatory,ValueFromPipeline)]$LineItem
     )
     process {
+        $NewSKU = $null
         $CustomAttributes = $LineItem | Convert-TervisShopifyCustomAttributesToObject
         if ($LineItem.sku) {
             switch ($LineItem.sku) {
