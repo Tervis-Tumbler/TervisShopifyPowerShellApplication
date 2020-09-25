@@ -8,8 +8,10 @@ function Invoke-TervisShopifyPowerShellApplicationProvision {
     $Nodes | Install-TervisShopifyPowerShellApplication_ItemInterface
     $Nodes | Install-TervisShopifyPowerShellApplication_InventoryInterface
     $Nodes | Install-TervisShopifyPowerShellApplication_OrderInterface
-    $Nodes | Install-TervisShopifyPowerShellApplication_PersonalizableItemListUpload
-    $Nodes | Install-TervisShopifyPowerShellApplication_EndlessAisleItemListUpload
+    if ($EnvironmentName -eq "Production") {
+        $Nodes | Install-TervisShopifyPowerShellApplication_PersonalizableItemListUpload
+        $Nodes | Install-TervisShopifyPowerShellApplication_EndlessAisleItemListUpload
+    }
 }
 
 function Install-TervisShopifyPowerShellApplicationLog {
