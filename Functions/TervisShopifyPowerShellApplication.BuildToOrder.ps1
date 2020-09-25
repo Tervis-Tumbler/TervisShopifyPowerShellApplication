@@ -165,7 +165,13 @@ function Select-TervisShopifyOrderSpecialOrderLines {
     )
     process {
         $LineItems = $Order.lineItems.edges.node
-        return $LineItems | Where-Object {$_.TervisProperties.isSpecialOrder -eq "true"}
+        $SpecialOrderLines = $LineItems | Where-Object {$_.TervisProperties.isSpecialOrder -eq "true"}
+        $SpecialOrderLines | ForEach-Object {
+            if ($_.TervisProperties.specialOrderQuantity) {
+                $_.quantity = $_.TervisProperties.specialOrderQuantity
+            }
+        }
+        return $SpecialOrderLines
     }
 }
 
