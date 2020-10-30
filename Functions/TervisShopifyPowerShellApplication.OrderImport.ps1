@@ -305,6 +305,7 @@ function New-TervisShopifyOrderObjectLines {
         #     $Order | Add-TervisShopifyTotalRefundSetLineItem
         # }
         $Order.$LineItemType.edges.node | Invoke-TervisShopifyLineDiscountRecalculation -IsRefund:$IsRefund
+        $Order | Split-TervisShopifyOrderSpecialOrderLines
         
         $LineItems += foreach ($Line in $Order.$LineItemType.edges.node) {
             if (
@@ -315,10 +316,10 @@ function New-TervisShopifyOrderObjectLines {
                 $LineItemCounter++
     
                 $Line | Invoke-TervisShopifyLineItemSkuSubstitution
-    
+                $LineType = $Line | Get-TervisShopifyLineItemType -IsRefund:$IsRefund
+
                 if ($IsRefund) {
-                    $LineType = "Tervis Credit Only Line"
-                    $InventoryItem = $Line.lineItem.sku
+                    $InventoryItem = $Line.lineItem.sku.ToUpper()
                     $OrderedQuantity = $Line.quantity * -1
                     $UnitListPrice = $Line.lineItem.originalUnitPriceSet.shopMoney.amount
                     $UnitSellingPrice = $Line.lineItem.discountedUnitPriceSet.shopMoney.amount
@@ -326,8 +327,7 @@ function New-TervisShopifyOrderObjectLines {
                     $TaxValue = $Line.totalTaxSet.shopMoney.amount
                     # $TaxValue = 0 # For refunds only, since tax is included in totalRefundSet
                 } else {
-                    $LineType = "Tervis Bill Only with Inv Line"
-                    $InventoryItem = $Line.sku
+                    $InventoryItem = $Line.sku.ToUpper()
                     $OrderedQuantity = $Line.quantity
                     $UnitListPrice = $Line.originalUnitPriceSet.shopMoney.amount
                     $UnitSellingPrice = $Line.discountedUnitPriceSet.shopMoney.amount
@@ -358,7 +358,6 @@ function New-TervisShopifyOrderObjectLines {
                     LAST_UPDATED_BY_NAME = "'SHOPIFY'"
                     TAX_VALUE = $TaxValue
                     # TAX_VALUE = "''" # For use in PRD until payments implemented
-    
                 }
             }
         }
@@ -388,6 +387,46 @@ function Invoke-TervisShopifyLineDiscountRecalculation {
     }
 }
 
+function Split-TervisShopifyOrderSpecialOrderLines {
+    param (
+        [Parameter(Mandatory,ValueFromPipeline)]$Order
+    )
+    process {
+        $LineItems = $Order.lineItems.edges.node
+        foreach ($Line in $LineItems) {
+            $CustomAttributes = $Line | Convert-TervisShopifyCustomAttributesToObject
+            
+            if ($CustomAttributes.isSpecialOrder -ne "true") { continue }
+            
+            # If entire line is a special order, don't split out the lines
+            if (
+                -not $CustomAttributes.specialOrderQuantity -or
+                $Line.quantity -eq $CustomAttributes.specialOrderQuantity
+            ) {
+                $Line.CustomAttributes = $Line.CustomAttributes | 
+                    Where-Object {$_.key -ne "specialOrderQuantity"}
+                continue
+            }
+
+            # Add new special order lines to order
+            $LineCopy = $Line | ConvertTo-Json -Depth 10 -Compress | ConvertFrom-Json
+            $LineCopy.quantity = [int]$CustomAttributes.specialOrderQuantity
+            $LineCopy.taxLines = [PSCustomObject]@{
+                priceSet = [PSCustomObject]@{
+                    shopMoney = [PSCustomObject]@{
+                        amount = 0
+                    }
+                }
+            }
+            $Order.lineItems.edges += [PSCustomObject]@{node = $LineCopy}
+
+            # Cleanse original line of special order properties
+            $Line.quantity = $Line.quantity - $CustomAttributes.specialOrderQuantity
+            $Line.CustomAttributes = $Line.CustomAttributes | Where-Object {$_.key -notlike "*specialOrder*"}
+        }
+    }    
+}
+
 function Add-TervisShopifyShippingLineItem {
     param (
         [Parameter(Mandatory,ValueFromPipeline)]$Order
@@ -406,6 +445,28 @@ function Add-TervisShopifyShippingLineItem {
             }
         }
         $Order.lineItems.edges += $ShippingNode
+    }
+}
+
+function Get-TervisShopifyLineItemType {
+    param (
+        [Parameter(Mandatory,ValueFromPipeline)]$Line,
+        [switch]$IsRefund
+    )
+    process {
+        if ($IsRefund) {
+            return "Tervis Credit Only Line"
+        }
+        
+        $CustomAttributes = $Line | Convert-TervisShopifyCustomAttributesToObject
+        if (
+            $Line.sku -like "*P" -or
+            $CustomAttributes.isSpecialOrder -eq "true"
+        ) {
+            return "Tervis Bill Only Line"
+        } else {
+            return "Tervis Bill Only with Inv Line"
+        }
     }
 }
 

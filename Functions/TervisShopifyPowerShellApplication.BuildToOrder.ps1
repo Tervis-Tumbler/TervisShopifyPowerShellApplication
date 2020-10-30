@@ -112,7 +112,7 @@ function New-TervisShopifyBuildToOrderLines {
                 ORDER_SOURCE_ID = "'1022'"
                 ORIG_SYS_DOCUMENT_REF = "'$($Order.EBSDocumentReference)'"
                 ORIG_SYS_LINE_REF = "'$($LineCounter)'"
-                LINE_TYPE = "'Tervis Bill Only with Inv Line'"
+                LINE_TYPE = "'Tervis Bill Only Line'"
                 CREATION_DATE = "sysdate"
                 LAST_UPDATE_DATE = "sysdate"
                 PROCESS_FLAG = "'N'"
