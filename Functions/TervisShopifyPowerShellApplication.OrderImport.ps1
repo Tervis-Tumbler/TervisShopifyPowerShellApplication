@@ -461,7 +461,8 @@ function Get-TervisShopifyLineItemType {
         $CustomAttributes = $Line | Convert-TervisShopifyCustomAttributesToObject
         if (
             $Line.sku -like "*P" -or
-            $CustomAttributes.isSpecialOrder -eq "true"
+            $CustomAttributes.isSpecialOrder -eq "true" -or
+            $Line.name -like "STORES CUSTOM*"
         ) {
             return "Tervis Bill Only Line"
         } else {
