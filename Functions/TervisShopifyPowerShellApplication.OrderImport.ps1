@@ -150,8 +150,9 @@ function New-TervisShopifyCCDummyNumber {
     )
     process {
         if ($Transaction.payment_details.credit_card_number) {
-            return $Transaction.id.ToString().PadLeft(12,"0").Substring(0,12) + `
-                $Transaction.payment_details.credit_card_number.Substring(15,4)            
+            # return $Transaction.id.ToString().PadLeft(12,"0").Substring(0,12) + `
+            #     $Transaction.payment_details.credit_card_number.Substring(15,4)
+            return "4012888888881881"
         } else {
             return ""
         }
@@ -533,6 +534,7 @@ function New-TervisShopifyOrderObjectPayments {
             # $CheckNumber = if ($PaymentTypeCode -eq "CHECK") {""}
             # $ReceiptMethodId = Get-TervisShopifyReceiptMethod -ReceiptMethodId $Order.ReceiptMethodId -PaymentTypeCode $PaymentTypeCode # if ($PaymentTypeCode -eq "CHECK") {$Order.ReceiptMethodId}
             $CreationDate = $Transaction.processed_at | ConvertTo-TervisShopifyOracleSqlDateString
+            $CreditCardExpiration = $Transaction | Get-TervisShopifyCCExpirationDate
             $ReceiptMethodId = Get-TervisShopifyReceiptMethod -PaymentTypeCode $PaymentTypeCode
 
             [PSCustomObject]@{
@@ -552,8 +554,8 @@ function New-TervisShopifyOrderObjectPayments {
                 PAYMENT_AMOUNT = $Transaction.amount
                 CREATION_DATE = "$CreationDate"
                 LAST_UPDATE_DATE = "sysdate"
-                CREDIT_CARD_EXPIRATION_MONTH = "'$($Transaction.receipt.payment_method_details.card.exp_month)'"
-                CREDIT_CARD_EXPIRATION_YEAR = "'$($Transaction.receipt.payment_method_details.card.exp_year)'"
+                CREDIT_CARD_EXPIRATION_MONTH = $CreditCardExpiration.Month
+                CREDIT_CARD_EXPIRATION_YEAR = $CreditCardExpiration.Year
                 CREDIT_CARD_PAYMENT_STATUS = "''"
                 PROCESS_FLAG = "'N'"
                 # SOURCE_NAME = 'SPF-OSP'
@@ -564,6 +566,26 @@ function New-TervisShopifyOrderObjectPayments {
                 RECEIPT_METHOD_ID = "'$($ReceiptMethodId)'"
                 PAYMENT_TRX_ID = "'$($Transaction.id)'"
             }
+        }
+    }
+}
+
+function Get-TervisShopifyCCExpirationDate {
+    param (
+        [Parameter(Mandatory,ValueFromPipeline)]$Transaction
+    )
+    process {
+        if ($Transaction.receipt.payment_method_details.card.exp_month) {
+            $Month = $Transaction.receipt.payment_method_details.card.exp_month
+            $Year = $Transaction.receipt.payment_method_details.card.exp_year
+        } elseif ($Transaction.receipt.charges.data[0].payment_method_details.card.exp_month) {
+            $Month = $Transaction.receipt.charges.data[0].payment_method_details.card.exp_month
+            $Year = $Transaction.receipt.charges.data[0].payment_method_details.card.exp_year
+        }
+        
+        return [PSCustomObject]@{
+            Month = "'$Month'"
+            Year = "'$Year'"
         }
     }
 }
