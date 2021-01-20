@@ -253,3 +253,32 @@ Invoke-TervisShopifyEndlessAisleItemListUpload -Environment $EnvironmentName
         Install-PowerShellApplication @PowerShellApplicationParameters
     }
 }
+
+function Install-TervisShopifyPowerShellApplication_ShopperTrakUpload {
+    param (
+        [Parameter(Mandatory,ValueFromPipelineByPropertyName)]$ComputerName,
+        [Parameter(Mandatory,ValueFromPipelineByPropertyName)]
+        [ValidateSet("Delta","Epsilon","Production")]$EnvironmentName
+    )
+    begin {
+        $ScheduledTasksCredential = Get-TervisPasswordstatePassword -Guid "eed2bd81-fd47-4342-bd59-b396da75c7ed" -AsCredential
+    }
+    process {
+        $PowerShellApplicationParameters = @{
+            ComputerName = $ComputerName
+            EnvironmentName = $EnvironmentName
+            ModuleName = "TervisShopifyPowerShellApplication"
+            TervisModuleDependencies = `
+                "TervisShopifyPowerShellApplication",
+                "PasswordstatePowershell",
+                "TervisPasswordstatePowershell"
+            PowerShellGalleryDependencies = "Posh-SSH"
+            ScheduledTaskName = "ShopifyShopperTrakUpload"
+            RepetitionIntervalName = "EveryDayAt730am"
+            CommandString = "Send-TervisShopifyReportingShopperTrakSalesData"
+            ScheduledTasksCredential = $ScheduledTasksCredential
+        }
+        
+        Install-PowerShellApplication @PowerShellApplicationParameters
+    }
+}
