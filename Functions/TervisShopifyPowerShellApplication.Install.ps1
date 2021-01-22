@@ -269,9 +269,12 @@ function Install-TervisShopifyPowerShellApplication_ShopperTrakUpload {
             EnvironmentName = $EnvironmentName
             ModuleName = "TervisShopifyPowerShellApplication"
             TervisModuleDependencies = `
-                "TervisShopifyPowerShellApplication",
+                "WebServicesPowerShellProxyBuilder",
+                "TervisMicrosoft.PowerShell.Utility",
+                "TervisMicrosoft.PowerShell.Security",
                 "PasswordstatePowershell",
-                "TervisPasswordstatePowershell"
+                "TervisPasswordstatePowershell",
+                "TervisShopifyPowerShellApplication"
             PowerShellGalleryDependencies = "Posh-SSH"
             ScheduledTaskName = "ShopifyShopperTrakUpload"
             RepetitionIntervalName = "EveryDayAt730am"
