@@ -383,7 +383,7 @@ function Invoke-TervisShopifyLineDiscountRecalculation {
         $DiscountedUnitPrice = $LineItem.discountedUnitPriceSet.shopMoney.amount
         $DiscountedLineTotal = $LineItem.discountedTotalSet.shopMoney.amount
         
-        if ($ListUnitPrice -eq $DiscountedUnitPrice) { return }
+        if ($ListUnitPrice -eq $DiscountedUnitPrice -or $LineItem.quantity -eq 0) { return }
         $ActualDiscountedPricePerUnit = $DiscountedLineTotal / $LineItem.quantity
         $LineItem.discountedUnitPriceSet.shopMoney.amount = $ActualDiscountedPricePerUnit
     }
