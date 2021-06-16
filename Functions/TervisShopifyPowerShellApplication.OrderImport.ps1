@@ -578,7 +578,7 @@ function Get-TervisShopifyCCExpirationDate {
         if ($Transaction.receipt.payment_method_details.card.exp_month) {
             $Month = $Transaction.receipt.payment_method_details.card.exp_month
             $Year = $Transaction.receipt.payment_method_details.card.exp_year
-        } elseif ($Transaction.receipt.charges.data[0].payment_method_details.card.exp_month) {
+        } elseif ($Transaction.receipt.charges.data) {
             $Month = $Transaction.receipt.charges.data[0].payment_method_details.card.exp_month
             $Year = $Transaction.receipt.charges.data[0].payment_method_details.card.exp_year
         }
