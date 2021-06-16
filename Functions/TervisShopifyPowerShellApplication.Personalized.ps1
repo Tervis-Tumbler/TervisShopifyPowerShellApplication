@@ -216,12 +216,16 @@ function Set-TervisShopifyOrderPersonalizedItemNumber {
     )
     process {
         $PersonalizationLines = $Order | Select-TervisShopifyOrderPersonalizationLines
+        # Need to add some check to make sure enough of the original cup exists to personalize
         foreach ($PersonalizationLine in $PersonalizationLines) {
             $CustomAttributes = $PersonalizationLine | Convert-TervisShopifyCustomAttributesToObject
             $RelatedLineItemSKU = $CustomAttributes.RelatedLineItemSKU
             $LineItemSource = $Order | Select-TervisShopifyOrderLineItem -SKU $RelatedLineItemSKU
+
+            # From here, need some logic to determine if we should copy the tax over to
+            # the first personalized cup, or completely ignore the tax (zero-tax)
             $NewLineItem = $LineItemSource | ConvertTo-Json -Depth 10 -Compress  | ConvertFrom-Json
-            $NewLineItem.node.customAttributes = $null
+            $NewLineItem.node.customAttributes = $null # this may already remove SO props, need to double check
             $NewLineItem.node.quantity = $PersonalizationLine.quantity
             $NewLineItem.node.sku = "$($CustomAttributes.RelatedLineItemSKU)P"
             $Order.lineItems.edges += $NewLineItem
@@ -238,5 +242,43 @@ function Select-TervisShopifyOrderLineItem {
     )
     process {
         return $Order.lineItems.edges | Where-Object {$_.node.sku -eq $SKU}
+    }
+}
+
+function Test-TervisShopifyOrderSufficientQuantityToPersonalize {
+    param (
+        [Parameter(Mandatory,ValueFromPipeline)]$Order
+    )
+    process {
+        $PersonalizationLines = $Order | Select-TervisShopifyOrderPersonalizationLines
+        $PersonalizationLines | Add-TervisShopifyLineItemProperties
+        
+        # Get all the SKUs
+        [array]$SKUsToBePersonalized = $PersonalizationLines.TervisProperties.RelatedLineItemSKU |
+            Select-Object -Unique
+            
+        # Create object to hold all values by SKU
+        $QuantityTable = $SKUsToBePersonalized |
+            ForEach-Object {
+                [PSCustomObject]@{
+                    SKU = $_
+                    OrigQty = 0
+                    PersQty = 0
+                }
+            }
+
+        # Get all original quantities
+        $QuantityTable | ForEach-Object {
+            $Line = $Order | Select-TervisShopifyOrderLineItem -SKU $_.SKU
+            $_.OrigQty = $Line.quantity
+        }
+
+        # Get all personalizations quantities
+        $QuantityTable | ForEach-Object {
+            $PersonalizationLines | 
+                Where-Object
+        }
+        # Compare. Throw error if more personalizations than original quantity.
+
     }
 }
