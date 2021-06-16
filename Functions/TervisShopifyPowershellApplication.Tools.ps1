@@ -34,11 +34,11 @@ function Invoke-TervisShopifyReprocessBTO {
     $IsBTO = $Order | Test-TervisShopifyBuildToOrder
     if ($IsBTO) {
         $OrderBTO = $Order | ConvertTo-TervisShopifyOrderBTO
+        $OrderObject = $OrderBTO | New-TervisShopifyBuildToOrderObject
+        $EBSQueryBTO = $OrderObject | Convert-TervisShopifyOrderObjectToEBSQuery
+        $text = $OrderObject | ConvertTo-JsonEx
+        Read-Host "$text`n`nContinue?"
         if (-not (Test-TervisShopifyEBSOrderExists -Order $OrderBTO)) {
-            $OrderObject = $OrderBTO | New-TervisShopifyBuildToOrderObject
-            $EBSQueryBTO = $OrderObject | Convert-TervisShopifyOrderObjectToEBSQuery
-            $text = $OrderObject | ConvertTo-JsonEx
-            Read-Host "$text`n`nContinue?"
             Invoke-EBSSQL -SQLCommand $EBSQueryBTO
         } else {
             Write-Warning "BTO already in EBS"
