@@ -30,8 +30,7 @@ function Invoke-TervisShopifyInterfaceOrderImport {
         try {
             if (
                 -not $Order.StoreCustomerNumber -or
-                -not $Order.Subinventory -or
-                -not $Order.ReceiptMethodId
+                -not $Order.Subinventory
             ) {throw "Location information incomplete. Please update LocationDefinition.csv."}
             if (-not (Test-TervisShopifyEBSOrderExists -Order $Order)) {
                 $EBSQuery = $Order | New-TervisShopifyOrderObject -ShopName $ShopName | Convert-TervisShopifyOrderObjectToEBSQuery 
