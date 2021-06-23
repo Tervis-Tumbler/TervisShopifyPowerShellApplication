@@ -33,15 +33,19 @@ function Invoke-TervisShopifyInterfaceOrderImport {
                 -not $Order.Subinventory
             ) {throw "Location information incomplete. Please update LocationDefinition.csv."}
             if (-not (Test-TervisShopifyEBSOrderExists -Order $Order)) {
-                $EBSQuery = $Order | New-TervisShopifyOrderObject -ShopName $ShopName | Convert-TervisShopifyOrderObjectToEBSQuery 
+                $EBSQuery = $Order | New-TervisShopifyOrderObject -ShopName $ShopName -ErrorAction Stop | Convert-TervisShopifyOrderObjectToEBSQuery -ErrorAction Stop
                 Invoke-EBSSQL -SQLCommand $EBSQuery
             }
             $IsBTO = $Order | Test-TervisShopifyBuildToOrder
             if ($IsBTO) {
                 $OrderBTO = $Order | ConvertTo-TervisShopifyOrderBTO
                 if (-not (Test-TervisShopifyEBSOrderExists -Order $OrderBTO)) {
-                    $EBSQueryBTO = $OrderBTO | New-TervisShopifyBuildToOrderObject | Convert-TervisShopifyOrderObjectToEBSQuery
-                    Invoke-EBSSQL -SQLCommand $EBSQueryBTO
+                    try {
+                        $EBSQueryBTO = $OrderBTO | New-TervisShopifyBuildToOrderObject -ErrorAction Stop | Convert-TervisShopifyOrderObjectToEBSQuery -ErrorAction Stop
+                        Invoke-EBSSQL -SQLCommand $EBSQueryBTO -ErrorAction Stop
+                    } catch {
+                        $Order | Set-ShopifyOrderTag -ShopName $ShopName -AddTag "NeedsReview" | Out-Null
+                    }
                 }
             }
             $Order | Set-ShopifyOrderTag -ShopName $ShopName -AddTag "ImportedToEBS" | Out-Null
@@ -80,7 +84,7 @@ function Invoke-TervisShopifyInterfaceOrderImport {
             if (
                 -not (Test-TervisShopifyEBSOrderExists -Order $Refund) -and $Refund.refundLineItems.edges[0]
             ) {
-                $EBSQuery = $Refund | New-TervisShopifyOrderObject -ShopName $ShopName | Convert-TervisShopifyOrderObjectToEBSQuery
+                $EBSQuery = $Refund | New-TervisShopifyOrderObject -ShopName $ShopName -ErrorAction Stop | Convert-TervisShopifyOrderObjectToEBSQuery -ErrorAction Stop
                 Invoke-EBSSQL -SQLCommand $EBSQuery 
             }
             $Refund.Order | Set-ShopifyOrderTag -ShopName $ShopName -RemoveTag $Refund.RefundTag -AddTag "RefundProcessed_$($Refund.RefundID)"
