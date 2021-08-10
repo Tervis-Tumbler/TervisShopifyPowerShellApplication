@@ -195,21 +195,6 @@ function Select-TervisShopifyOrderPersonalizationLines {
     }
 }
 
-function Add-TervisShopifyOrderPersonalizationSKU {
-    param (
-        [Parameter(Mandatory,ValueFromPipeline)]$PersonalizationLine
-    )
-    process {
-        $Price = $PersonalizationLine.originalUnitPriceSet.shopMoney.amount
-        # Basing this on price is fragile. Try basing it on presence of one or two personalization sides.
-        switch ($Price) {
-            "5.0"   { $SKU = "1154266"; break }
-            "7.5"   { $SKU = "1154269"; break }
-        }
-        $PersonalizationLine | Add-Member -MemberType NoteProperty -Name sku -Value $SKU -Force
-    }
-}
-
 function Set-TervisShopifyOrderPersonalizedItemNumber {
     param (
         [Parameter(Mandatory,ValueFromPipeline)]$Order
