@@ -51,7 +51,7 @@ function Convert-TervisShopifyCustomAttributesToObject {
         $Object = [PSCustomObject]::new()
         foreach ($Attribute in $Node.customAttributes) {
             if ($Attribute.key) {
-                $Value = $Attribute.value | Invoke-TervisShopifyOracleStringEscapeQuotes
+                $Value = $Attribute.value # | Invoke-TervisShopifyOracleStringEscapeQuotes
                 $Object | Add-Member -MemberType NoteProperty -Name $Attribute.key -Value $Value -Force
             }
         }
