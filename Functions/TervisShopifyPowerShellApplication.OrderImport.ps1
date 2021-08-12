@@ -396,7 +396,8 @@ function New-TervisShopifyOrderObjectLines {
         $LineItems += foreach ($Line in $Order.$LineItemType.edges.node) {
             if (
                 $Line.quantity -ne 0 -and
-                $Line.name -notlike "Personalization for*"
+                $Line.name -notlike "Personalization for*" -and
+                $Line.lineItem.name -notlike "Personalization for*"
             ) {
 
                 $LineItemCounter++
