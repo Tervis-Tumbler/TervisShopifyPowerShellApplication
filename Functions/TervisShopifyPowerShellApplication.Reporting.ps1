@@ -17,10 +17,33 @@ function Send-TervisShopifyReportingShopperTrakSalesData {
             throw "No date string found in latest ShopperTrak file."
         }
         $FilteredData = $Data | Where-Object {$_ -like "*$FilterString*"}
+        $SubstitutedData = $FilteredData | Set-TervisShopifyReportingStoreIDs
         $OutboundFile = "$($ReportContext.URL)\Outbound\$($File.Name)"
-        $FilteredData | Out-File -FilePath $OutboundFile -Force -Encoding ascii
+        $SubstitutedData | Out-File -FilePath $OutboundFile -Force -Encoding ascii
         $SFTPSession = New-SFTPSession -ComputerName $ShopperTrakSFTPURL -Credential $ShopperTrakSFTPCredential -AcceptKey
         Set-SFTPFile -SFTPSession $SFTPSession -LocalFile $OutboundFile -Verbose -RemotePath "/"
         Move-Item -Path $File.FullName -Destination "$($ReportContext.URL)\ArchivedInbound"
+    }
+}
+
+function Set-TervisShopifyReportingStoreIDs {
+    param (
+        [Parameter(ValueFromPipeline)]$ReportContent
+    )
+    begin {
+        $SubstitutionTable = Import-Csv -Path "\\tervis.prv\applications\Shopify\ShopperTrak\Config\Paylocity_Shopify_StoreIDs.csv"
+        $Result = ""
+    }
+    process {
+        $SplitContent = $ReportContent -split ","
+        foreach ($Substitution in $SubstitutionTable) {
+            if ($SplitContent[0] -eq $Substitution.SalesVendorID) {
+                $SplitContent[0] = $Substitution.StoreID
+            }
+        }
+        $Result += "$($SplitContent -join ",")`n"
+    }
+    end {
+        $Result
     }
 }
