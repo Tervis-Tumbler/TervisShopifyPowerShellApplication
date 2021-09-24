@@ -47,7 +47,7 @@ function New-TervisShopifyCustomerSuppliedProperties {
         if ($CustomAttributes.Side2CustomerSuppliedDecorationNote) {
             $DecorationNotes += "SIDE 2 ~~CUSTSUP~~$($CustomAttributes.Side2CustomerSuppliedDecorationNote)"
         }
-        $DecorationNoteString = $DecorationNotes -join " " | Invoke-TervisShopifyOracleStringEscapeQuotes
+        $DecorationNoteString = $DecorationNotes -join " " # | Invoke-TervisShopifyOracleStringEscapeQuotes
         # $DecorationNoteString = $DecorationNoteString -Replace "[^\w\s.,]","_"
 
         return [PSCustomObject]@{
@@ -152,16 +152,16 @@ function New-TervisShopifyPersonalizedObjects {
                 SIDE1_FONT = "'$($CustomAttributes.Side1FontName)'"
                 SIDE1_COLOR = "'$($CustomAttributes.Side1ColorName)'"
                 ATTRIBUTE1 = "'$($CustomerSuppliedProperties.Side1CustomerSupplied)'" # CustomerProvided = PersGrap, Other              
-                SIDE1_TEXT1 = "'$($CustomAttributes.Side1Line1 | Invoke-TervisShopifyOracleStringEscapeQuotes)'"
-                SIDE1_TEXT2 = "'$($CustomAttributes.Side1Line2 | Invoke-TervisShopifyOracleStringEscapeQuotes)'"
-                SIDE1_TEXT3 = "'$($CustomAttributes.Side1Line3 | Invoke-TervisShopifyOracleStringEscapeQuotes)'"
+                SIDE1_TEXT1 = "'$($CustomAttributes.Side1Line1)'"
+                SIDE1_TEXT2 = "'$($CustomAttributes.Side1Line2)'"
+                SIDE1_TEXT3 = "'$($CustomAttributes.Side1Line3)'"
                 
                 SIDE2_FONT = "'$($CustomAttributes.FontName)'"
                 SIDE2_COLOR = "'$($CustomAttributes.FontColor)'"
                 ATTRIBUTE7 = "'$($CustomerSuppliedProperties.Side2CustomerSupplied)'" # CustomerProvided = PersGrap, Other
-                SIDE2_TEXT1 = "'$($CustomAttributes.Side2Line1 | Invoke-TervisShopifyOracleStringEscapeQuotes)'"
-                SIDE2_TEXT2 = "'$($CustomAttributes.Side2Line2 | Invoke-TervisShopifyOracleStringEscapeQuotes)'"
-                SIDE2_TEXT3 = "'$($CustomAttributes.Side2Line3 | Invoke-TervisShopifyOracleStringEscapeQuotes)'"
+                SIDE2_TEXT1 = "'$($CustomAttributes.Side2Line1)'"
+                SIDE2_TEXT2 = "'$($CustomAttributes.Side2Line2)'"
+                SIDE2_TEXT3 = "'$($CustomAttributes.Side2Line3)'"
 
                 ATTRIBUTE14 = "'$($CustomerSuppliedProperties.CustomerSuppliedDecorationNote)'"
             }
@@ -192,21 +192,6 @@ function Select-TervisShopifyOrderPersonalizationLines {
     process {
         $Order.lineItems.edges.node | 
             Where-Object name -Match "Personalization for" # This should be updated to look for a specific SKU or something
-    }
-}
-
-function Add-TervisShopifyOrderPersonalizationSKU {
-    param (
-        [Parameter(Mandatory,ValueFromPipeline)]$PersonalizationLine
-    )
-    process {
-        $Price = $PersonalizationLine.originalUnitPriceSet.shopMoney.amount
-        # Basing this on price is fragile. Try basing it on presence of one or two personalization sides.
-        switch ($Price) {
-            "5.0"   { $SKU = "1154266"; break }
-            "7.5"   { $SKU = "1154269"; break }
-        }
-        $PersonalizationLine | Add-Member -MemberType NoteProperty -Name sku -Value $SKU -Force
     }
 }
 

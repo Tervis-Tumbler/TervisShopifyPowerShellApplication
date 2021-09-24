@@ -33,16 +33,20 @@ function Invoke-TervisShopifyInterfaceOrderImport {
                 -not $Order.Subinventory
             ) {throw "Location information incomplete. Please update LocationDefinition.csv."}
             if (-not (Test-TervisShopifyEBSOrderExists -Order $Order)) {
-                $EBSQuery = $Order | New-TervisShopifyOrderObject -ShopName $ShopName -ErrorAction Stop | Convert-TervisShopifyOrderObjectToEBSQuery -ErrorAction Stop
-                Invoke-EBSSQL -SQLCommand $EBSQuery
+                $OrderObject = $Order | New-TervisShopifyOrderObject -ShopName $ShopName -ErrorAction Stop 
+                $ParameterizedOrderObject = $OrderObject | ConvertTo-TervisShopifyEBSParameterizedValues
+                $EBSQuery = $ParameterizedOrderObject.OrderObject | Convert-TervisShopifyOrderObjectToEBSQuery -ErrorAction Stop
+                Invoke-EBSSQL -SQLCommand $EBSQuery -Parameters $ParameterizedOrderObject.Parameters -ErrorAction Stop
             }
             $IsBTO = $Order | Test-TervisShopifyBuildToOrder
             if ($IsBTO) {
                 $OrderBTO = $Order | ConvertTo-TervisShopifyOrderBTO
                 if (-not (Test-TervisShopifyEBSOrderExists -Order $OrderBTO)) {
                     try {
-                        $EBSQueryBTO = $OrderBTO | New-TervisShopifyBuildToOrderObject -ErrorAction Stop | Convert-TervisShopifyOrderObjectToEBSQuery -ErrorAction Stop
-                        Invoke-EBSSQL -SQLCommand $EBSQueryBTO -ErrorAction Stop
+                        $OrderObjectBTO = $OrderBTO | New-TervisShopifyBuildToOrderObject -ErrorAction Stop 
+                        $ParameterizedOrderObjectBTO = $OrderObjectBTO | ConvertTo-TervisShopifyEBSParameterizedValues -ErrorAction Stop
+                        $EBSQueryBTO =  $ParameterizedOrderObjectBTO.OrderObject | Convert-TervisShopifyOrderObjectToEBSQuery -ErrorAction Stop
+                        Invoke-EBSSQL -SQLCommand $EBSQueryBTO -Parameters $ParameterizedOrderObjectBTO.Parameters -ErrorAction Stop 
                     } catch {
                         $Order | Set-ShopifyOrderTag -ShopName $ShopName -AddTag "NeedsReview" | Out-Null
                     }
@@ -84,8 +88,10 @@ function Invoke-TervisShopifyInterfaceOrderImport {
             if (
                 -not (Test-TervisShopifyEBSOrderExists -Order $Refund) -and $Refund.refundLineItems.edges[0]
             ) {
-                $EBSQuery = $Refund | New-TervisShopifyOrderObject -ShopName $ShopName -ErrorAction Stop | Convert-TervisShopifyOrderObjectToEBSQuery -ErrorAction Stop
-                Invoke-EBSSQL -SQLCommand $EBSQuery 
+                $RefundObject = $Refund | New-TervisShopifyOrderObject -ShopName $ShopName -ErrorAction Stop
+                $ParameterizedRefundObject = $RefundObject | ConvertTo-TervisShopifyEBSParameterizedValues -ErrorAction Stop
+                $EBSQuery = $ParameterizedRefundObject.OrderObject | Convert-TervisShopifyOrderObjectToEBSQuery -ErrorAction Stop
+                Invoke-EBSSQL -SQLCommand $EBSQuery -Parameters $ParameterizedRefundObject.Parameters -ErrorAction Stop
             }
             $Refund.Order | Set-ShopifyOrderTag -ShopName $ShopName -RemoveTag $Refund.RefundTag -AddTag "RefundProcessed_$($Refund.RefundID)"
             $RefundsProcessed++
@@ -200,18 +206,93 @@ function New-TervisShopifyOrderObject {
     )
     process {
         # Initial order object
-        $OrderObject = $Order| New-TervisShopifyOrderObjectBase
+        $OrderObject = $Order | New-TervisShopifyOrderObjectBase
 
         # Order lines conversion, for both sales and refunds
         $OrderObject.LineItems += $Order | New-TervisShopifyOrderObjectLines
 
-        # Order payments conversion - Disabled during COVID online store
+        # Order payments conversion
         $OrderObject.Payments += $Order | New-TervisShopifyOrderObjectPayments -ShopName $ShopName
 
         # Add refund information to OrderObject headers
         $OrderObject | Add-TervisShopifyRefundOrderHeaderFields -Order $Order
 
         return $OrderObject
+    }
+}
+
+function ConvertTo-TervisShopifyEBSParameterizedValues {
+    param (
+        [Parameter(Mandatory,ValueFromPipeline)]$OrderObject
+    )
+    process {
+        $ParameterCount = 0
+        $Parameters = @()
+        $Tables = $OrderObject | 
+            Get-Member | 
+            Where-Object MemberType -eq NoteProperty | 
+            Select-Object -ExpandProperty Name
+        foreach ($Table in $Tables) {
+            $OrderObject."$Table" | ForEach-Object {
+                $TableObject = $_
+                $Keys = $TableObject | 
+                    Get-Member | 
+                    Where-Object MemberType -eq NoteProperty | 
+                    Select-Object -ExpandProperty Name
+
+                foreach ($Key in $Keys) {
+                    $ParameterCount++
+                    $ParameterName = "p$ParameterCount"
+                    $Value = $TableObject."$Key"
+        
+                    switch ($Value)
+                    {   
+                        { $_ -eq "sysdate" } { Write-Host -ForegroundColor Cyan "[VAR] $Table.$Key = $_"; break }
+                        { $_ -match "TO_DATE" } {
+                            $DateCode = $_.Substring(9,14)
+                            $Parameters += [PSCustomObject]@{
+                                ParameterName = $ParameterName
+                                DbType = "Varchar2"
+                                Obj = $DateCode
+                                Direction = "Input"
+                            }
+                            $TableObject."$Key" = "TO_DATE(:$ParameterName, 'YYYYMMDDHH24MISS')"
+                            # Write-Host -ForegroundColor Magenta "[CMD] $Table.$Key = $($TableObject."$Key") - $($Parameters[-1].obj)"                            
+                            break
+                        }
+                        { $_[0] -eq "'" -or $_.ToString()[0] -eq "-" } {
+                            $TableObject."$Key" = ":$ParameterName"
+                            $Parameters += [PSCustomObject]@{
+                                ParameterName = $ParameterName
+                                DbType = "Varchar2"
+                                Obj = $_.ToString().Trim("'")
+                                Direction = "Input"
+                            }
+                            # Write-Host -ForegroundColor Green "[STR] $Table.$Key = $($TableObject."$Key") - $($Parameters[-1].obj)"
+                            break
+                        }
+                        { $_[0] -match "\d" } {
+                            $Parameters += [PSCustomObject]@{
+                                ParameterName = $ParameterName
+                                DbType = "Double"
+                                Obj = $_
+                                Direction = "Input"
+                            }
+                            $TableObject."$Key" = ":$ParameterName"
+                            # Write-Host -ForegroundColor Blue "[NUM] $Table.$Key = $($TableObject."$Key") - $($Parameters[-1].obj)"
+                            break
+                        }
+                        default { 
+                            # Write-Host -ForegroundColor Red "[NUL] $Table.$Key = $_" 
+                        }
+                    }
+                }
+            }
+        }
+        return [PSCustomObject]@{
+            OrderObject = $OrderObject
+            Parameters = $Parameters
+        }
     }
 }
 
@@ -315,7 +396,8 @@ function New-TervisShopifyOrderObjectLines {
         $LineItems += foreach ($Line in $Order.$LineItemType.edges.node) {
             if (
                 $Line.quantity -ne 0 -and
-                $Line.name -notlike "Personalization for*"
+                $Line.name -notlike "Personalization for*" -and
+                $Line.lineItem.name -notlike "Personalization for*"
             ) {
 
                 $LineItemCounter++

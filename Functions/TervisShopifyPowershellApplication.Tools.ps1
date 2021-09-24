@@ -35,11 +35,12 @@ function Invoke-TervisShopifyReprocessBTO {
     if ($IsBTO) {
         $OrderBTO = $Order | ConvertTo-TervisShopifyOrderBTO
         $OrderObject = $OrderBTO | New-TervisShopifyBuildToOrderObject
-        $EBSQueryBTO = $OrderObject | Convert-TervisShopifyOrderObjectToEBSQuery
+        $ParameterizedOrderObject = $OrderObject | ConvertTo-TervisShopifyEBSParameterizedValues
+        $EBSQueryBTO = $ParameterizedOrderObject.OrderObject | Convert-TervisShopifyOrderObjectToEBSQuery
         $text = $OrderObject | ConvertTo-JsonEx
         Read-Host "$text`n`nContinue?"
         if (-not (Test-TervisShopifyEBSOrderExists -Order $OrderBTO)) {
-            Invoke-EBSSQL -SQLCommand $EBSQueryBTO
+            Invoke-EBSSQL -SQLCommand $EBSQueryBTO -Parameters $ParameterizedOrderObject.Parameters
         } else {
             Write-Warning "BTO already in EBS"
         }
@@ -64,10 +65,11 @@ function Invoke-TervisShopifyReprocessOrder {
         ) {throw "Location information incomplete. Please update LocationDefinition.csv."}
         if (-not (Test-TervisShopifyEBSOrderExists -Order $Order)) {
             $OrderObject = $Order | New-TervisShopifyOrderObject -ShopName $ShopName
-            $EBSQuery = $OrderObject | Convert-TervisShopifyOrderObjectToEBSQuery
+            $ParameterizedOrderObject = $OrderObject | ConvertTo-TervisShopifyEBSParameterizedValues
+            $EBSQuery = $ParameterizedOrderObject.OrderObject | Convert-TervisShopifyOrderObjectToEBSQuery
             $text = $OrderObject | ConvertTo-JsonEx
             Read-Host "$text`n`nContinue?"
-            Invoke-EBSSQL -SQLCommand $EBSQuery
+            Invoke-EBSSQL -SQLCommand $EBSQuery -Parameters $ParameterizedOrderObject.Parameters -ErrorAction Stop
         }
         $Order | Set-ShopifyOrderTag -ShopName $ShopName -AddTag "ImportedToEBS" | Out-Null
     } catch {
