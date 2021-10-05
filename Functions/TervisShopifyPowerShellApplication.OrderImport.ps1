@@ -237,7 +237,7 @@ function ConvertTo-TervisShopifyEBSParameterizedValues {
                 $TableObject = $_
                 $Keys = $TableObject | 
                     Get-Member | 
-                    Where-Object MemberType -eq NoteProperty | 
+                    Where-Object MemberType -eq NoteProperty | # Change this to only filter to human-input fields
                     Select-Object -ExpandProperty Name
 
                 foreach ($Key in $Keys) {
