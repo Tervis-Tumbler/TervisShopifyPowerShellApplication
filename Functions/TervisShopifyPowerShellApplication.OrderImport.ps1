@@ -661,13 +661,18 @@ function Get-TervisShopifyCCExpirationDate {
         [Parameter(Mandatory,ValueFromPipeline)]$Transaction
     )
     process {
-        if ($Transaction.receipt.payment_method_details.card.exp_month) {
-            $Month = $Transaction.receipt.payment_method_details.card.exp_month
-            $Year = $Transaction.receipt.payment_method_details.card.exp_year
-        } elseif ($Transaction.receipt.charges.data) {
-            $Month = $Transaction.receipt.charges.data[0].payment_method_details.card.exp_month
-            $Year = $Transaction.receipt.charges.data[0].payment_method_details.card.exp_year
-        }
+        # # Shopify keeps changing the API here, so spoofing it
+        # if ($Transaction.receipt.payment_method_details.card.exp_month) {
+        #     $Month = $Transaction.receipt.payment_method_details.card.exp_month
+        #     $Year = $Transaction.receipt.payment_method_details.card.exp_year
+        # } elseif ($Transaction.receipt.charges.data) {
+        #     $Month = $Transaction.receipt.charges.data[0].payment_method_details.card_present.exp_month
+        #     $Year = $Transaction.receipt.charges.data[0].payment_method_details.card_present.exp_year
+        # }
+
+        $ExpDate = (Get-Date).AddYears(1)
+        $Month = $ExpDate.Month
+        $Year = $ExpDate.Year
         
         return [PSCustomObject]@{
             Month = "'$Month'"
