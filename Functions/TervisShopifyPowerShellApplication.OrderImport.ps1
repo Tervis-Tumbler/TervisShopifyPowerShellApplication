@@ -26,7 +26,7 @@ function Invoke-TervisShopifyInterfaceOrderImport {
     foreach ($Order in $ShopifyOrders) {
         $i++
         Write-Progress -Activity "Shopify Order Import Interface" -CurrentOperation "Importing orders to EBS" `
-            -PercentComplete ($i * 100 / $ShopifyOrders.Count)
+            -PercentComplete ($i * 100 / $ShopifyOrders.Count) -Status "$i of $($ShopifyOrders.Count)"
         try {
             if (
                 -not $Order.StoreCustomerNumber -or
@@ -79,7 +79,7 @@ function Invoke-TervisShopifyInterfaceOrderImport {
     foreach ($Refund in $ShopifyRefunds) {
         $i++
         Write-Progress -Activity "Shopify Order Import Interface" -CurrentOperation "Importing refunds to EBS" `
-            -PercentComplete ($i * 100 / $ShopifyRefunds.Count)
+            -PercentComplete ($i * 100 / $ShopifyRefunds.Count) -Status "$i of $($ShopifyRefunds.Count)"
         try {
             if (
                 -not $Refund.StoreCustomerNumber -or
@@ -225,6 +225,10 @@ function ConvertTo-TervisShopifyEBSParameterizedValues {
     param (
         [Parameter(Mandatory,ValueFromPipeline)]$OrderObject
     )
+    begin {
+        $ModuleBase = (Get-Module -Name TervisShopifyPowerShellApplication).ModuleBase
+        $HumanInputFields = (Import-PowerShellDataFile -Path $ModuleBase\Config\HumanInputFields.psd1).HumanInputFields
+    }
     process {
         $ParameterCount = 0
         $Parameters = @()
@@ -237,7 +241,7 @@ function ConvertTo-TervisShopifyEBSParameterizedValues {
                 $TableObject = $_
                 $Keys = $TableObject | 
                     Get-Member | 
-                    Where-Object MemberType -eq NoteProperty | # Change this to only filter to human-input fields
+                    Where-Object Name -in $HumanInputFields |
                     Select-Object -ExpandProperty Name
 
                 foreach ($Key in $Keys) {
