@@ -186,7 +186,7 @@ function Get-TervisShopifyReceiptMethod {
         [Parameter(Mandatory)]$PaymentTypeCode
     )
     if (-not $Script:CCReceiptMethodId) {
-        $Query = "SELECT receipt_method_id FROM apps.AR_RECEIPT_METHODS WHERE name = 'SHOPIFY-Credit Card'"
+        $Query = "SELECT receipt_method_id FROM apps.AR_RECEIPT_METHODS WHERE name = 'SHOPIFY-CC Seaside'"
         $Script:CCReceiptMethodId = Invoke-EBSSQL -SQLCommand $Query | Select-Object -ExpandProperty RECEIPT_METHOD_ID
         if (-not $Script:CCReceiptMethodId) { throw "Could not retrieve receipt method from EBS." }
     }
