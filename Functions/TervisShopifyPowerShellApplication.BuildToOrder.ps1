@@ -75,6 +75,35 @@ function New-TervisShopifyBuildToOrderCustomerInfo {
             IS_BILL_TO_ADDRESS = "'N'"
             FREIGHT_TERMS = "'$($Order.CustomAttributes.freightTerms)'"
             SHIP_METHOD_CODE = "'$($Order.CustomAttributes.shipMethodCode)'"
+        },
+        [PSCustomObject]@{
+            ORIG_SYS_DOCUMENT_REF = "'$($Order.EBSDocumentReference)'"
+            PARENT_CUSTOMER_REF = "'$($Order.StoreCustomerNumber)'" # Trying with store customer number from order
+            PERSON_FIRST_NAME = "'$($Order.CustomAttributes.customerFirstName)'"
+            PERSON_LAST_NAME = "'$($Order.CustomAttributes.customerLastName)'"
+            ADDRESS1 = "'$($Order.CustomAttributes.customerAddress1)'"
+            ADDRESS2 = "'$($Order.CustomAttributes.customerAddress2)'"
+            CITY = "'$($Order.CustomAttributes.customerCity)'"
+            STATE = "'$($Order.CustomAttributes.customerState)'" # This still returns full state name. Check GraphQL query.
+            POSTAL_CODE = "'$($Order.CustomAttributes.customerZip)'"
+            COUNTRY = "'$($Order.CustomAttributes.customerCountryCode)'"
+            PROCESS_FLAG = "'N'"
+            SOURCE_NAME = "'RMS'"
+            OPERATING_UNIT_NAME = "'Tervis Operating Unit'"
+            CREATED_BY_NAME = "'SHOPIFY'"
+            LAST_UPDATED_BY_NAME = "'SHOPIFY'"
+            CREATION_DATE = "sysdate"
+            # Below only applies to CUSTOMER_TYPE "ORGANIZATION" 
+            PARTY_ID = "360580"
+            CUSTOMER_TYPE = "'ORGANIZATION'"
+            ORGANIZATION_NAME = "'$CustomerName'"
+            CUSTOMER_INFO_TYPE_CODE = "'CONTACT'"
+            CUSTOMER_INFO_REF = "'$($Order.EBSDocumentReference)'"
+            IS_SHIPPING_CONTACT = "'Y'"
+            IS_SHIP_TO_ADDRESS = "'Y'"
+            IS_BILL_TO_ADDRESS = "'N'"
+            FREIGHT_TERMS = "'$($Order.CustomAttributes.freightTerms)'"
+            SHIP_METHOD_CODE = "'$($Order.CustomAttributes.shipMethodCode)'"
         }
     }
 }

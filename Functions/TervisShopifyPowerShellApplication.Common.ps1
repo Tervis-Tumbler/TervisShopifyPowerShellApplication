@@ -51,7 +51,7 @@ function Convert-TervisShopifyCustomAttributesToObject {
         $Object = [PSCustomObject]::new()
         foreach ($Attribute in $Node.customAttributes) {
             if ($Attribute.key) {
-                $Value = $Attribute.value # | Invoke-TervisShopifyOracleStringEscapeQuotes
+                $Value = $Attribute.value | Invoke-TervisShopifyOracleStringEscapeQuotes
                 $Object | Add-Member -MemberType NoteProperty -Name $Attribute.key -Value $Value -Force
             }
         }
@@ -87,15 +87,17 @@ INSERT ALL
         $Query += "VALUES ($($HeaderPropertyValues -join ","))`n"
 
         # Convert to customer
-        $CustomerProperties = $Customer | 
-            Get-Member -MemberType NoteProperty | 
-            Select-Object -ExpandProperty Name
-        $CustomerValues = $CustomerProperties | ForEach-Object {
-            $Customer.$_
-        }
-        if ($CustomerProperties) {
-            $Query += "INTO xxoe_customer_info_iface_all ($($CustomerProperties -join ","))`n"
-            $Query += "VALUES ($($CustomerValues -join ","))`n"
+        foreach ($CustomerRecord in $Customer) {
+            $CustomerProperties = $CustomerRecord | 
+                Get-Member -MemberType NoteProperty | 
+                Select-Object -ExpandProperty Name
+            $CustomerValues = $CustomerProperties | ForEach-Object {
+                $CustomerRecord.$_
+            }
+            if ($CustomerProperties) {
+                $Query += "INTO xxoe_customer_info_iface_all ($($CustomerProperties -join ","))`n"
+                $Query += "VALUES ($($CustomerValues -join ","))`n"
+            }
         }
 
         # Convert to lines
@@ -135,7 +137,7 @@ function Invoke-TervisShopifyOracleStringEscapeQuotes {
         [Parameter(ValueFromPipeline)]$String
     )
     process {
-        $String -replace "'","''"
+        $String -replace "'","''" -replace "‘","''"
     }
 }
 
