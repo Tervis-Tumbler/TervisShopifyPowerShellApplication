@@ -68,7 +68,7 @@ function Invoke-TervisShopifyAddOrUpdateProduct {
                             namespace = "tervis"
                             key = "ebsDescription"
                             value = $ProductRecord.ITEM_DESCRIPTION
-                            valueType = "STRING"
+                            type = "STRING"
                         }
                     }
 
