@@ -100,8 +100,6 @@ function New-TervisShopifyBuildToOrderCustomerInfo {
             CUSTOMER_INFO_TYPE_CODE = "'CONTACT'"
             CUSTOMER_INFO_REF = "'$($Order.EBSDocumentReference)'"
             IS_SHIPPING_CONTACT = "'Y'"
-            IS_SHIP_TO_ADDRESS = "'Y'"
-            IS_BILL_TO_ADDRESS = "'N'"
             FREIGHT_TERMS = "'$($Order.CustomAttributes.freightTerms)'"
             SHIP_METHOD_CODE = "'$($Order.CustomAttributes.shipMethodCode)'"
         }
