@@ -50,9 +50,9 @@ function New-TervisShopifyBuildToOrderCustomerInfo {
         
         function Test-NullValue {
             param (
-                [Parameter(ValueFromPipeline)]$Input
+                [Parameter(ValueFromPipeline)]$String
             )
-            if ($Input -eq "''") { throw "Missing shipping address data"}
+            if ($String -eq "''") { throw "Missing shipping address data"}
         }
 
         [PSCustomObject]@{
