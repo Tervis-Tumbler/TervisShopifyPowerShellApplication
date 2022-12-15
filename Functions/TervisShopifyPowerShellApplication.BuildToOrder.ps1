@@ -47,18 +47,25 @@ function New-TervisShopifyBuildToOrderCustomerInfo {
     )
     process {
         $CustomerName = ("$($Order.CustomAttributes.customerFirstName) $($Order.CustomAttributes.customerLastName)").Trim(" ")
+        
+        function Test-NullValue {
+            param (
+                [Parameter(ValueFromPipeline)]$Input
+            )
+            if ($Input -eq "''") { throw "Missing shipping address data"}
+        }
 
         [PSCustomObject]@{
             ORIG_SYS_DOCUMENT_REF = "'$($Order.EBSDocumentReference)'"
-            PARENT_CUSTOMER_REF = "'$($Order.StoreCustomerNumber)'" # Trying with store customer number from order
-            PERSON_FIRST_NAME = "'$($Order.CustomAttributes.customerFirstName)'"
+            PARENT_CUSTOMER_REF = "'$($Order.StoreCustomerNumber)'"
+            PERSON_FIRST_NAME = "'$($Order.CustomAttributes.customerFirstName)'" | Test-NullValue
             PERSON_LAST_NAME = "'$($Order.CustomAttributes.customerLastName)'"
-            ADDRESS1 = "'$($Order.CustomAttributes.customerAddress1)'"
+            ADDRESS1 = "'$($Order.CustomAttributes.customerAddress1)'" | Test-NullValue
             ADDRESS2 = "'$($Order.CustomAttributes.customerAddress2)'"
-            CITY = "'$($Order.CustomAttributes.customerCity)'"
-            STATE = "'$($Order.CustomAttributes.customerState)'" # This still returns full state name. Check GraphQL query.
-            POSTAL_CODE = "'$($Order.CustomAttributes.customerZip)'"
-            COUNTRY = "'$($Order.CustomAttributes.customerCountryCode)'"
+            CITY = "'$($Order.CustomAttributes.customerCity)'" | Test-NullValue
+            STATE = "'$($Order.CustomAttributes.customerState)'" | Test-NullValue
+            POSTAL_CODE = "'$($Order.CustomAttributes.customerZip)'" | Test-NullValue
+            COUNTRY = "'$($Order.CustomAttributes.customerCountryCode)'" | Test-NullValue
             PROCESS_FLAG = "'N'"
             SOURCE_NAME = "'RMS'"
             OPERATING_UNIT_NAME = "'Tervis Operating Unit'"
@@ -73,18 +80,18 @@ function New-TervisShopifyBuildToOrderCustomerInfo {
             CUSTOMER_INFO_REF = "'$($Order.EBSDocumentReference)'"
             IS_SHIP_TO_ADDRESS = "'Y'"
             IS_BILL_TO_ADDRESS = "'N'"
-            FREIGHT_TERMS = "'$($Order.CustomAttributes.freightTerms)'"
-            SHIP_METHOD_CODE = "'$($Order.CustomAttributes.shipMethodCode)'"
+            FREIGHT_TERMS = "'$($Order.CustomAttributes.freightTerms)'" | Test-NullValue
+            SHIP_METHOD_CODE = "'$($Order.CustomAttributes.shipMethodCode)'" | Test-NullValue
         },
         [PSCustomObject]@{
             ORIG_SYS_DOCUMENT_REF = "'$($Order.EBSDocumentReference)'"
-            PARENT_CUSTOMER_REF = "'$($Order.StoreCustomerNumber)'" # Trying with store customer number from order
+            PARENT_CUSTOMER_REF = "'$($Order.StoreCustomerNumber)'"
             PERSON_FIRST_NAME = "'$($Order.CustomAttributes.customerFirstName)'"
             PERSON_LAST_NAME = "'$($Order.CustomAttributes.customerLastName)'"
             ADDRESS1 = "'$($Order.CustomAttributes.customerAddress1)'"
             ADDRESS2 = "'$($Order.CustomAttributes.customerAddress2)'"
             CITY = "'$($Order.CustomAttributes.customerCity)'"
-            STATE = "'$($Order.CustomAttributes.customerState)'" # This still returns full state name. Check GraphQL query.
+            STATE = "'$($Order.CustomAttributes.customerState)'"
             POSTAL_CODE = "'$($Order.CustomAttributes.customerZip)'"
             COUNTRY = "'$($Order.CustomAttributes.customerCountryCode)'"
             PROCESS_FLAG = "'N'"
