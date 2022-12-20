@@ -53,6 +53,7 @@ function New-TervisShopifyBuildToOrderCustomerInfo {
                 [Parameter(ValueFromPipeline)]$String
             )
             if ($String -eq "''") { throw "Missing shipping address data"}
+            $String
         }
 
         [PSCustomObject]@{
