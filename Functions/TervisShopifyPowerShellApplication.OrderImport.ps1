@@ -357,6 +357,7 @@ function New-TervisShopifyOrderObjectBase {
                 ORDER_TYPE = "'Store Order'"
                 CUSTOMER_NUMBER = "'$($Order.StoreCustomerNumber)'"
                 BOOKED_FLAG = "'Y'"
+                REQUEST_DATE = $OrderedDate
                 CREATION_DATE = "sysdate"
                 LAST_UPDATE_DATE = "sysdate"
                 PROCESS_FLAG = "'N'"
