@@ -138,6 +138,7 @@ function New-TervisShopifyBuildToOrderLines {
                 $LineNote = "**Special Order**$($Line.TervisProperties.specialOrderNote)"
                 $InventoryItem = $Line.sku
             } else {
+                if (-not $Line.TervisProperties.RelatedLineItemSKU) { throw "No personalization data on line item" }
                 $LineNote = $CustomerSuppliedProperties.CustomerSuppliedDecorationNote
                 $InventoryItem = "$($Line.TervisProperties.RelatedLineItemSKU)P"
             }
