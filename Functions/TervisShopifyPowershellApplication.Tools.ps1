@@ -63,12 +63,14 @@ function Invoke-TervisShopifyReprocessOrder {
             -not $Order.Subinventory -or
             -not $Order.ReceiptMethodId
         ) {throw "Location information incomplete. Please update LocationDefinition.csv."}
-        if (-not (Test-TervisShopifyEBSOrderExists -Order $Order)) {
-            $OrderObject = $Order | New-TervisShopifyOrderObject -ShopName $ShopName
-            $ParameterizedOrderObject = $OrderObject | ConvertTo-TervisShopifyEBSParameterizedValues
-            $EBSQuery = $ParameterizedOrderObject.OrderObject | Convert-TervisShopifyOrderObjectToEBSQuery
-            $text = $OrderObject | ConvertTo-JsonEx
-            Read-Host "$text`n`nContinue?"
+        $OrderObject = $Order | New-TervisShopifyOrderObject -ShopName $ShopName
+        $ParameterizedOrderObject = $OrderObject | ConvertTo-TervisShopifyEBSParameterizedValues
+        $EBSQuery = $ParameterizedOrderObject.OrderObject | Convert-TervisShopifyOrderObjectToEBSQuery
+        $text = $OrderObject | ConvertTo-JsonEx
+        Read-Host "$text`n`nContinue?"
+        if ((Test-TervisShopifyEBSOrderExists -Order $Order)) {
+            Write-Warning "Order already exists in EBS. Skipping."
+        } else {
             Invoke-EBSSQL -SQLCommand $EBSQuery -Parameters $ParameterizedOrderObject.Parameters -ErrorAction Stop
         }
         $Order | Set-ShopifyOrderTag -ShopName $ShopName -AddTag "ImportedToEBS" | Out-Null
