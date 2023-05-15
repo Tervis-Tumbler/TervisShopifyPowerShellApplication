@@ -52,7 +52,7 @@ function Invoke-TervisShopifyAddOrUpdateProduct {
         try {
             if ($ProductRecord.web_primary_name) {
                 $Title = $ProductRecord.web_primary_name | ConvertTo-ShopifyFriendlyString
-                $Description = $ProductRecord | New-TervisShopifyItemDescription | ConvertTo-ShopifyFriendlyString
+                $Description = $ProductRecord | New-TervisShopifyItemDescription
             } else {
                 $Title = $ProductRecord.ITEM_DESCRIPTION
             }
