@@ -37,7 +37,7 @@ function Invoke-TervisShopifyReprocessBTO {
         $OrderObject = $OrderBTO | New-TervisShopifyBuildToOrderObject
         $ParameterizedOrderObject = $OrderObject | ConvertTo-TervisShopifyEBSParameterizedValues
         $EBSQueryBTO = $ParameterizedOrderObject.OrderObject | Convert-TervisShopifyOrderObjectToEBSQuery
-        $text = $OrderObject | ConvertTo-JsonEx
+        $text = $ParameterizedOrderObject | ConvertTo-JsonEx -Depth 10
         Read-Host "$text`n`nContinue?"
         if (-not (Test-TervisShopifyEBSOrderExists -Order $OrderBTO)) {
             Invoke-EBSSQL -SQLCommand $EBSQueryBTO -Parameters $ParameterizedOrderObject.Parameters
@@ -66,7 +66,7 @@ function Invoke-TervisShopifyReprocessOrder {
         $OrderObject = $Order | New-TervisShopifyOrderObject -ShopName $ShopName
         $ParameterizedOrderObject = $OrderObject | ConvertTo-TervisShopifyEBSParameterizedValues
         $EBSQuery = $ParameterizedOrderObject.OrderObject | Convert-TervisShopifyOrderObjectToEBSQuery
-        $text = $OrderObject | ConvertTo-JsonEx
+        $text = $ParameterizedOrderObject | ConvertTo-JsonEx -Depth 10
         Read-Host "$text`n`nContinue?"
         if ((Test-TervisShopifyEBSOrderExists -Order $Order)) {
             Write-Warning "Order already exists in EBS. Skipping."
