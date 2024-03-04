@@ -147,6 +147,7 @@ function Get-TervisShopifyPaymentCollectionEvent {
     process {
         switch ($Transaction.kind) {
             "sale" { "PREPAY"; break }
+            "capture" { "PREPAY"; break } # Added "capture" since as of 2/28/24, Payments Gateway doesn't always mark CC txs as "sale" until much later
             "authorization" { "INVOICE"; break }
             default {""}
         }
